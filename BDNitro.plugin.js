@@ -68,15 +68,17 @@ module.exports = (() => {
 				"discord_id": "359063827091816448",
 				"github_username": "srgobi"
 			}],
-			"version": "5.4.5",
+			"version": "5.4.6",
 			"description": "¡Desbloquea todos los modos de compartir pantalla y usa gestos GIF y entre servidores!",
 			"github": "https://github.com/srgobi/BDNitro",
 			"github_raw": "https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js"
 		},
 		changelog: [
 			{
-				title: "5.4.5",
+				title: "5.4.6",
 				items: [
+					"Se corrigió la prioridad de los badges en el perfil.",
+					"Se implementaron todos los badges actuales de Discord, ahora puedes añadir todos los badges que quieras.",
 					"Se modificó la implementación de UsrBg para que esté más cerca de la implementación original.",
 					"Se simplificó algún código relacionado con los estilos.",
 					"Se corrigieron los temas de gradiente que se eliminan después de la recarga."
