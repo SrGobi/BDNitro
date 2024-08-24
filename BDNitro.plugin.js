@@ -876,119 +876,125 @@ module.exports = (() => {
 				} //End of customProfilePictureEncoding()
 
 
-				//Aplicar badges customizados
+				// Aplicar badges customizados
 				LoadingBadges() {
-
 					// Uso de la insignia de usuario de BDNitro
 					BdApi.DOM.addStyle("BDNitroBadges", `
-						a[aria-label="A fellow BDNitro user!"] img {
-							content: url("https://raw.githubusercontent.com/srgobi/srgobi.github.io/main/badge.png") !important;
-						}
-						
-						div [aria-label="A fellow BDNitro user!"] > a > img {
-							content: url("https://raw.githubusercontent.com/srgobi/srgobi.github.io/main/badge.png") !important;
-						}
-					`);
+        a[aria-label="¡Un compañero usuario de BDNitro!"] img {
+            content: url("https://raw.githubusercontent.com/SrGobi/BDNitro/main/badges/bd_user.svg") !important;
+        }
+        
+        div [aria-label="¡Un compañero usuario de BDNitro!"] > a > img {
+            content: url("https://raw.githubusercontent.com/SrGobi/BDNitro/main/badges/bd_user.svg") !important;
+        }
+    `);
 
-					//Parches de insignia de perfil de usuario
+					// Configura las prioridades de las insignias
+					const badgeConfig = {
+						"DISCORD_CERTIFIED_MODERATOR": {
+							id: "DISCORD_CERTIFIED_MODERATOR",
+							icon: "fee1624003e2fee35cb398e125dc479b",
+							description: "Exalumnos de la academia de moderadores",
+							link: "https://discord.com/safety",
+							priority: 1
+						},
+						"HYPESQUAD_EVENTS": {
+							id: "HYPESQUAD_EVENTS",
+							icon: "bf01d1073931f921909045f3a39fd264",
+							description: "HypeSquad Events",
+							link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3",
+							priority: 2
+						},
+						"HOUSE_BRILLIANCE": {
+							id: "HOUSE_BRILLIANCE",
+							icon: "011940fd013da3f7fb926e4a1cd2e618",
+							description: "House of Brilliance",
+							link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3",
+							priority: 3
+						},
+						"BUGHUNTER_LEVEL_1": {
+							id: "BUGHUNTER_LEVEL_1",
+							icon: "2717692c7dca7289b35297368a940dd0",
+							description: "Bug Hunter Level 1",
+							link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3",
+							priority: 4
+						},
+						"EARLY_VERIFIED_BOT_DEVELOPER": {
+							id: "EARLY_VERIFIED_BOT_DEVELOPER",
+							icon: "6df5892e0f35b051f8b61eace34f4967",
+							description: "Early Verified Bot Developer",
+							link: "",
+							priority: 5
+						},
+						"NITRO": {
+							id: "NITRO",
+							icon: "2ba85e8026a8614b640c2837bcdfe21b",
+							description: "Nitro User",
+							link: "https://github.com/srgobi/BDNitro#contributors",
+							priority: 6
+						},
+						"bd_user": {
+							id: "bd_user",
+							icon: "2ba85e8026a8614b640c2837bcdfe21b",
+							description: "¡Un compañero usuario de BDNitro!",
+							link: "https://github.com/srgobi/BDNitro",
+							priority: 7
+						}
+						// Agrega más insignias con prioridades aquí si es necesario
+					};
+
+					// Parches de insignia de perfil de usuario
 					BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
-						//malas comprobaciones de datos
+						// Comprobaciones de datos
 						if (ret == undefined) return;
 						if (ret.userId == undefined) return;
 						if (ret.badges == undefined) return;
 
-						const badgesList = []; //lista de ID de credencial del usuario actualmente procesado
+						const badgesList = []; // Lista de ID de credencial del usuario actualmente procesado
 
-						for (let i = 0; i < ret.badges.length; i++) { //para cada una de las credenciales de usuario actualmente procesadas
-							badgesList.push(ret.badges[i].id); //agregue cada una de las ID de insignia de este usuario a BadgesList
+						for (let i = 0; i < ret.badges.length; i++) {
+							badgesList.push(ret.badges[i].id); // Agregar cada una de las ID de insignia de este usuario a BadgesList
 						}
 
-						// Configura las insignias basadas en las configuraciones del plugin
-						const badgeConfig = {};
+						// Añadir insignias personalizadas a la lista si no están ya presentes
+						if (badgeUserIDs.includes(ret.userId) && !badgesList.includes("bd_user")) {
+							ret.badges.push(badgeConfig["bd_user"]);
+						}
 
-						// Recorre las insignias seleccionadas por el usuario
-						Object.keys(badgeConfig).forEach(badgeKey => {
-							const badge = badgeConfig[badgeKey];
+						if (badgeUserIDs.includes(ret.userId) && this.settings.DISCORD_CERTIFIED_MODERATOR && !badgesList.includes("DISCORD_CERTIFIED_MODERATOR")) {
+							ret.badges.push(badgeConfig["DISCORD_CERTIFIED_MODERATOR"]);
+						}
 
-							// Si la insignia está disponible y aún no ha sido añadida al perfil del usuario
-							if (badge && !badgesList.includes(badge.id)) {
-								ret.badges.push(badge);
-							}
+						if (badgeUserIDs.includes(ret.userId) && this.settings.HYPESQUAD_EVENTS && !badgesList.includes("HYPESQUAD_EVENTS")) {
+							ret.badges.push(badgeConfig["HYPESQUAD_EVENTS"]);
+						}
+
+						if (badgeUserIDs.includes(ret.userId) && this.settings.HOUSE_BRILLIANCE && !badgesList.includes("HOUSE_BRILLIANCE")) {
+							ret.badges.push(badgeConfig["HOUSE_BRILLIANCE"]);
+						}
+
+						if (badgeUserIDs.includes(ret.userId) && this.settings.BUGHUNTER_LEVEL_1 && !badgesList.includes("BUGHUNTER_LEVEL_1")) {
+							ret.badges.push(badgeConfig["BUGHUNTER_LEVEL_1"]);
+						}
+
+						if (badgeUserIDs.includes(ret.userId) && this.settings.EARLY_VERIFIED_BOT_DEVELOPER && !badgesList.includes("EARLY_VERIFIED_BOT_DEVELOPER")) {
+							ret.badges.push(badgeConfig["EARLY_VERIFIED_BOT_DEVELOPER"]);
+						}
+
+						if (badgeUserIDs.includes(ret.userId) && this.settings.NITRO && !badgesList.includes("NITRO")) {
+							ret.badges.push(badgeConfig["NITRO"]);
+						}
+
+						// Ordenar las insignias en función de su prioridad
+						ret.badges.sort((a, b) => {
+							const priorityA = badgeConfig[a.id]?.priority || Number.MAX_VALUE;
+							const priorityB = badgeConfig[b.id]?.priority || Number.MAX_VALUE;
+							return priorityA - priorityB;
 						});
 
-						//if list of users that should have yabdp_user badge includes current user, and they don't already have the badge applied,
-						if (badgeUserIDs.includes(ret.userId) && !badgesList.includes("yabdp_user")) {
-							ret.badges.push({
-								id: "yabdp_user",
-								icon: "2ba85e8026a8614b640c2837bcdfe21b",
-								description: "¡Un compañero usuario de BDNitro!",
-								link: "https://github.com/srgobi/BDNitro"
-							});
-						}
+					}); // Fin del parche de getUserProfile
+				} // Fin de LoadingBadges()
 
-						//si el usuario actualmente procesado no tiene la insignia de DISCORD_CERTIFIED_MODERATOR y tiene `true` en la configuración de la insignia del DISCORD_CERTIFIED_MODERATOR,
-						if (badgeUserIDs.includes(ret.userId) && this.settings.DISCORD_CERTIFIED_MODERATOR && !badgesList.includes("DISCORD_CERTIFIED_MODERATOR")) {
-							ret.badges.push({
-								id: "DISCORD_CERTIFIED_MODERATOR",
-								icon: "fee1624003e2fee35cb398e125dc479b",
-								description: "Exalumnos de la academia de moderadores",
-								link: "https://discord.com/safety"
-							});
-						}
-
-						//si el usuario actualmente procesado no tiene la insignia de HYPESQUAD_EVENTS y tiene `true` en la configuración de la insignia del HYPESQUAD_EVENTS,
-						if (badgeUserIDs.includes(ret.userId) && this.settings.HYPESQUAD_EVENTS && !badgesList.includes("HYPESQUAD_EVENTS")) {
-							ret.badges.push({
-								id: "HYPESQUAD_EVENTS",
-								icon: "bf01d1073931f921909045f3a39fd264",
-								description: "HypeSquad Events",
-								link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3"
-							});
-						}
-
-						//si el usuario actualmente procesado no tiene la insignia de HOUSE_BRILLIANCE y tiene `true` en la configuración de la insignia del HOUSE_BRILLIANCE,
-						if (badgeUserIDs.includes(ret.userId) && this.settings.HOUSE_BRILLIANCE && !badgesList.includes("HOUSE_BRILLIANCE")) {
-							ret.badges.push({
-								id: "HOUSE_BRILLIANCE",
-								icon: "011940fd013da3f7fb926e4a1cd2e618",
-								description: "House of Brilliance",
-								link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3"
-							});
-						}
-
-						//si el usuario actualmente procesado no tiene la insignia de BUGHUNTER_LEVEL_1 y tiene `true` en la configuración de la insignia del BUGHUNTER_LEVEL_1,
-						if (badgeUserIDs.includes(ret.userId) && this.settings.BUGHUNTER_LEVEL_1 && !badgesList.includes("BUGHUNTER_LEVEL_1")) {
-							ret.badges.push({
-								id: "BUGHUNTER_LEVEL_1",
-								icon: "2717692c7dca7289b35297368a940dd0",
-								description: "Bug Hunter Level 1",
-								link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3"
-							});
-						}
-
-						//si el usuario actualmente procesado no tiene la insignia de EARLY_VERIFIED_BOT_DEVELOPER y tiene `true` en la configuración de la insignia del EARLY_VERIFIED_BOT_DEVELOPER,
-						if (badgeUserIDs.includes(ret.userId) && this.settings.EARLY_VERIFIED_BOT_DEVELOPER && !badgesList.includes("EARLY_VERIFIED_BOT_DEVELOPER")) {
-							ret.badges.push({
-								id: "EARLY_VERIFIED_BOT_DEVELOPER",
-								icon: "6df5892e0f35b051f8b61eace34f4967",
-								description: "Early Verified Bot Developer",
-								link: ""
-							});
-						}
-
-						//si el usuario actualmente procesado no tiene la insignia de NITRO y tiene `true` en la configuración de la insignia del NITRO,
-						if (badgeUserIDs.includes(ret.userId) && this.settings.NITRO && !badgesList.includes("NITRO")) {
-							//add the yabdp contributor badge to the contributor's list of badges
-							ret.badges.push({
-								id: "NITRO",
-								icon: "2ba85e8026a8614b640c2837bcdfe21b",
-								description: "Nitro User",
-								link: "https://github.com/srgobi/BDNitro#contributors"
-							});
-						}
-
-					}); //Fin del parche de getUserProfile
-				} //Fin de LoadingBadges()
 
 				secondsightifyRevealOnly(t) {
 					if ([...t].some(x => (0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f))) {
