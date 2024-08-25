@@ -132,14 +132,15 @@ module.exports = (() => {
 
 			return class BDNitro extends Plugin {
 				defaultSettings = {
-					DISCORD_CERTIFIED_MODERATOR: false,
-					HYPESQUAD_EVENTS: false,
-					HOUSE_BRILLIANCE: false,
-					HOUSE_BRAVERY: false,
-					HOUSE_BALANCE: false,
-					BUGHUNTER_LEVEL_1: false,
-					EARLY_VERIFIED_BOT_DEVELOPER: false,
-					NITRO: false,
+					"certified_moderator": false,
+					"hypesquad": false,
+					"hypesquad_house_1": false,
+					"hypesquad_house_2": false,
+					"hypesquad_house_3": false,
+					"bug_hunter_level_1": false,
+					"verified_developer": false,
+					"NITRO": false,
+					"early_supporter": false,
 					"emojiSize": 64,
 					"screenSharing": true,
 					"emojiBypass": true,
@@ -183,14 +184,15 @@ module.exports = (() => {
 				getSettingsPanel() {
 					return Settings.SettingPanel.build(_ => this.saveAndUpdate(), ...[
 						new Settings.SettingGroup("Badges").append(...[
-							new Settings.Switch("Moderador Certificado", "Desbloquea el badge de exalumnos de la academia de moderadores", this.settings.DISCORD_CERTIFIED_MODERATOR, value => this.settings.DISCORD_CERTIFIED_MODERATOR = value),
-							new Settings.Switch("Eventos del HypeSquad", "Desbloquea el badge de eventos del HypeSquad", this.settings.HYPESQUAD_EVENTS, value => this.settings.HYPESQUAD_EVENTS = value),
-							new Settings.Switch("House Brilliance", "Desbloquea el badge de contribuidor", this.settings.HOUSE_BRILLIANCE, value => this.settings.HOUSE_BRILLIANCE = value),
-							new Settings.Switch("House Bravery", "Desbloquea el badge de contribuidor", this.settings.HOUSE_BRAVERY, value => this.settings.HOUSE_BRAVERY = value),
-							new Settings.Switch("House Balance", "Desbloquea el badge de contribuidor", this.settings.HOUSE_BALANCE, value => this.settings.HOUSE_BALANCE = value),
-							new Settings.Switch("Bug Hunter", "Desbloquea el badge de cazador de bugs", this.settings.BUGHUNTER_LEVEL_1, value => this.settings.BUGHUNTER_LEVEL_1 = value),
-							new Settings.Switch("Early Bot Developer", "Desbloquea el badge de desarrollador de bots temprano", this.settings.EARLY_VERIFIED_BOT_DEVELOPER, value => this.settings.EARLY_VERIFIED_BOT_DEVELOPER = value),
+							new Settings.Switch("Moderador Certificado", "Desbloquea el badge de exalumnos de la academia de moderadores", this.settings.certified_moderator, value => this.settings.certified_moderator = value),
+							new Settings.Switch("Eventos del HypeSquad", "Desbloquea el badge de eventos del HypeSquad", this.settings.hypesquad, value => this.settings.hypesquad = value),
+							new Settings.Switch("House Brilliance", "Desbloquea el badge de contribuidor", this.settings.hypesquad_house_2, value => this.settings.hypesquad_house_2 = value),
+							new Settings.Switch("House Bravery", "Desbloquea el badge de contribuidor", this.settings.hypesquad_house_1, value => this.settings.hypesquad_house_1 = value),
+							new Settings.Switch("House Balance", "Desbloquea el badge de contribuidor", this.settings.hypesquad_house_3, value => this.settings.hypesquad_house_3 = value),
+							new Settings.Switch("Bug Hunter", "Desbloquea el badge de cazador de bugs", this.settings.bug_hunter_level_1, value => this.settings.bug_hunter_level_1 = value),
+							new Settings.Switch("Early Bot Developer", "Desbloquea el badge de desarrollador de bots temprano", this.settings.verified_developer, value => this.settings.verified_developer = value),
 							new Settings.Switch("Nitro", "Desbloquea el badge de Nitro", this.settings.NITRO, value => this.settings.NITRO = value),
+							new Settings.Switch("Early Supporter", "Desbloquea el badge de Early Supporter", this.settings.early_supporter, value => this.settings.early_supporter = value)
 						]),
 						new Settings.SettingGroup("Funciones para compartir pantalla").append(...[
 							new Settings.Switch("Compartir pantalla de alta calidad", "Compartir pantalla 1080p/Fuente a 60 fps. Habilítelo si desea utilizar alguna opción relacionada con Compartir pantalla.", this.settings.screenSharing, value => this.settings.screenSharing = value),
@@ -287,7 +289,6 @@ module.exports = (() => {
 						)
 					])
 				}
-
 
 				saveAndUpdate() { //Guarda y actualiza configuraciones y ejecuta funciones.
 					Utilities.saveSettings(this.getName(), this.settings);
@@ -533,7 +534,6 @@ module.exports = (() => {
 					});
 				} //End of saveAndUpdate()
 
-
 				experiments() {
 					if (this.hasAppliedExperiments) return;
 					//Código gentilmente robado de https://gist.github.com/MeguminSama/2cae24c9e4c335c661fa94e72235d4c4?permalink_comment_id=4952988#gistcomment-4952988
@@ -563,7 +563,6 @@ module.exports = (() => {
 					}
 
 				}
-
 
 				clientThemes() {
 					if (this.clientThemesModule == undefined) this.clientThemesModule = Webpack.getModule(Webpack.Filters.byProps("isPreview"));
@@ -680,7 +679,6 @@ module.exports = (() => {
 					});
 				} //Fin de clientThemes()
 
-
 				customProfilePictureDecoding() {
 					if (this.getAvatarUrlModule == undefined) this.getAvatarUrlModule = Webpack.getByPrototypeKeys("getAvatarURL").prototype;
 
@@ -756,7 +754,6 @@ module.exports = (() => {
 						return originalFunction(userId, size, shouldAnimate);
 					})
 				}
-
 
 				//Botones de personalización de perfil PFP personalizados y código de codificación.
 				async customProfilePictureEncoding(secondsightifyEncodeOnly) {
@@ -877,7 +874,6 @@ module.exports = (() => {
 					}); //end of patch
 				} //End of customProfilePictureEncoding()
 
-
 				// Aplicar badges customizados
 				LoadingBadges() {
 					// Uso de la insignia de usuario de BDNitro
@@ -893,56 +889,76 @@ module.exports = (() => {
 
 					// Configura las prioridades de las insignias
 					const badgeConfig = {
-						"DISCORD_CERTIFIED_MODERATOR": {
-							id: "DISCORD_CERTIFIED_MODERATOR",
+						"certified_moderator": {
+							id: "certified_moderator",
 							icon: "fee1624003e2fee35cb398e125dc479b",
 							description: "Exalumnos de la academia de moderadores",
 							link: "https://discord.com/safety",
 							priority: 1
 						},
-						"HYPESQUAD_EVENTS": {
-							id: "HYPESQUAD_EVENTS",
+						"hypesquad": {
+							id: "hypesquad",
 							icon: "bf01d1073931f921909045f3a39fd264",
 							description: "HypeSquad Events",
 							link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3",
 							priority: 2
 						},
-						"HOUSE_BRILLIANCE": {
-							id: "HOUSE_BRILLIANCE",
-							icon: "011940fd013da3f7fb926e4a1cd2e618",
-							description: "House of Brilliance",
-							link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3",
+						"hypesquad_house_1": {
+							id: "hypesquad_house_1",
+							icon: "8a88d63823d8a71cd5e390baa45efa02",
+							description: "Bravery de HypeSquad",
+							link: "https://discord.com/settings/hypesquad-online",
 							priority: 3
 						},
-						"BUGHUNTER_LEVEL_1": {
-							id: "BUGHUNTER_LEVEL_1",
-							icon: "2717692c7dca7289b35297368a940dd0",
-							description: "Bug Hunter Level 1",
-							link: "https://support.discord.com/hc/en-us/articles/360035962891-Profile-Badges-101#h_01GM67K5EJ16ZHYZQ5MPRW3JT3",
+						"hypesquad_house_2": {
+							id: "hypesquad_house_2",
+							icon: "011940fd013da3f7fb926e4a1cd2e618",
+							description: "House of Brilliance",
+							link: "https://discord.com/settings/hypesquad-online",
 							priority: 4
 						},
-						"EARLY_VERIFIED_BOT_DEVELOPER": {
-							id: "EARLY_VERIFIED_BOT_DEVELOPER",
-							icon: "6df5892e0f35b051f8b61eace34f4967",
-							description: "Early Verified Bot Developer",
-							link: "",
+						"hypesquad_house_3": {
+							id: "hypesquad_house_3",
+							icon: "3aa41de486fa12454c3761e8e223442e",
+							description: "Balance de HypeSquad",
+							link: "https://discord.com/settings/hypesquad-online",
 							priority: 5
+						},
+						"bug_hunter_level_1": {
+							id: "bug_hunter_level_1",
+							icon: "2717692c7dca7289b35297368a940dd0",
+							description: "Discord Bug Hunter",
+							link: "https://support.discord.com/hc/en-us/articles/360046057772-Discord-Bugs",
+							priority: 6
+						},
+						"verified_developer": {
+							id: "verified_developer",
+							icon: "6df5892e0f35b051f8b61eace34f4967",
+							description: "Desarrollador inicial de bots verificado",
+							link: "",
+							priority: 7
 						},
 						"NITRO": {
 							id: "NITRO",
 							icon: "2ba85e8026a8614b640c2837bcdfe21b",
 							description: "Nitro User",
 							link: "https://github.com/srgobi/BDNitro#contributors",
-							priority: 6
+							priority: 8
 						},
 						"bd_user": {
 							id: "bd_user",
 							icon: "2ba85e8026a8614b640c2837bcdfe21b",
 							description: "¡Un compañero usuario de BDNitro!",
 							link: "https://github.com/srgobi/BDNitro",
-							priority: 7
+							priority: 9
+						},
+						"early_supporter": {
+							description: "Partidario inicial",
+							icon: "7060786766c9c840eb3019e725d2b358",
+							id: "early_supporter",
+							link: "https://discord.com/settings/premium",
+							priority: 10
 						}
-						// Agrega más insignias con prioridades aquí si es necesario
 					};
 
 					// Parches de insignia de perfil de usuario
@@ -958,33 +974,47 @@ module.exports = (() => {
 							badgesList.push(ret.badges[i].id); // Agregar cada una de las ID de insignia de este usuario a BadgesList
 						}
 
+						console.log(badgeUserIDs);
+
 						// Añadir insignias personalizadas a la lista si no están ya presentes
 						if (badgeUserIDs.includes(ret.userId) && !badgesList.includes("bd_user")) {
 							ret.badges.push(badgeConfig["bd_user"]);
 						}
 
-						if (badgeUserIDs.includes(ret.userId) && this.settings.DISCORD_CERTIFIED_MODERATOR && !badgesList.includes("DISCORD_CERTIFIED_MODERATOR")) {
-							ret.badges.push(badgeConfig["DISCORD_CERTIFIED_MODERATOR"]);
+						if (badgeUserIDs.includes(ret.userId) && this.settings.certified_moderator && !badgesList.includes("certified_moderator")) {
+							ret.badges.push(badgeConfig["certified_moderator"]);
 						}
 
-						if (badgeUserIDs.includes(ret.userId) && this.settings.HYPESQUAD_EVENTS && !badgesList.includes("HYPESQUAD_EVENTS")) {
-							ret.badges.push(badgeConfig["HYPESQUAD_EVENTS"]);
+						if (badgeUserIDs.includes(ret.userId) && this.settings.hypesquad && !badgesList.includes("hypesquad")) {
+							ret.badges.push(badgeConfig["hypesquad"]);
 						}
 
-						if (badgeUserIDs.includes(ret.userId) && this.settings.HOUSE_BRILLIANCE && !badgesList.includes("HOUSE_BRILLIANCE")) {
-							ret.badges.push(badgeConfig["HOUSE_BRILLIANCE"]);
+						if (badgeUserIDs.includes(ret.userId) && this.settings.hypesquad_house_1 && !badgesList.includes("hypesquad_house_1")) {
+							ret.badges.push(badgeConfig["hypesquad_house_1"]);
 						}
 
-						if (badgeUserIDs.includes(ret.userId) && this.settings.BUGHUNTER_LEVEL_1 && !badgesList.includes("BUGHUNTER_LEVEL_1")) {
-							ret.badges.push(badgeConfig["BUGHUNTER_LEVEL_1"]);
+						if (badgeUserIDs.includes(ret.userId) && this.settings.hypesquad_house_2 && !badgesList.includes("hypesquad_house_2")) {
+							ret.badges.push(badgeConfig["hypesquad_house_2"]);
 						}
 
-						if (badgeUserIDs.includes(ret.userId) && this.settings.EARLY_VERIFIED_BOT_DEVELOPER && !badgesList.includes("EARLY_VERIFIED_BOT_DEVELOPER")) {
-							ret.badges.push(badgeConfig["EARLY_VERIFIED_BOT_DEVELOPER"]);
+						if (badgeUserIDs.includes(ret.userId) && this.settings.hypesquad_house_3 && !badgesList.includes("hypesquad_house_3")) {
+							ret.badges.push(badgeConfig["hypesquad_house_3"]);
+						}
+
+						if (badgeUserIDs.includes(ret.userId) && this.settings.bug_hunter_level_1 && !badgesList.includes("bug_hunter_level_1")) {
+							ret.badges.push(badgeConfig["bug_hunter_level_1"]);
+						}
+
+						if (badgeUserIDs.includes(ret.userId) && this.settings.verified_developer && !badgesList.includes("verified_developer")) {
+							ret.badges.push(badgeConfig["verified_developer"]);
 						}
 
 						if (badgeUserIDs.includes(ret.userId) && this.settings.NITRO && !badgesList.includes("NITRO")) {
 							ret.badges.push(badgeConfig["NITRO"]);
+						}
+
+						if (badgeUserIDs.includes(ret.userId) && this.settings.early_supporter && !badgesList.includes("early_supporter")) {
+							ret.badges.push(badgeConfig["early_supporter"]);
 						}
 
 						// Ordenar las insignias en función de su prioridad
@@ -997,7 +1027,6 @@ module.exports = (() => {
 					}); // Fin del parche de getUserProfile
 				} // Fin de LoadingBadges()
 
-
 				secondsightifyRevealOnly(t) {
 					if ([...t].some(x => (0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f))) {
 						// 3y3 text detected. Revealing...
@@ -1007,7 +1036,6 @@ module.exports = (() => {
 						return;
 					}
 				}
-
 
 				secondsightifyEncodeOnly(t) {
 					if ([...t].some(x => (0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f))) {
@@ -1019,25 +1047,24 @@ module.exports = (() => {
 					}
 				}
 
-
-				//Everything related to Fake Profile Effects.
+				//Todo lo relacionado con Efectos de Perfil Falso.
 				async profileFX(secondsightifyEncodeOnly) {
 
-					if (this.settings.killProfileEffects) return; //profileFX is mutually exclusive with killProfileEffects (obviously)
+					if (this.settings.killProfileEffects) return; //profileFX es mutuamente excluyente con killProfileEffects (obviamente)
 
 
-					//wait for profile effects module
+					//esperar el módulo de efectos de perfil
 					await Webpack.waitForModule(Webpack.Filters.byProps("profileEffects", "tryItOutId"));
 
-					//try to get profile effects data
+					//intenta obtener datos de efectos de perfil
 					if (this.profileEffects == undefined) this.profileEffects = Webpack.getStore("ProfileEffectStore").profileEffects;
 					if (this.fetchProfileEffects == undefined) this.fetchProfileEffects = Webpack.getAllByKeys("z").filter((obj) => obj.z.toString().includes("USER_PROFILE_EFFECTS_FETCH"))[0].z;
 
-					//if profile effects data hasn't been fetched by the client yet
+					//si el cliente aún no ha obtenido los datos de efectos del perfil
 					if (this.profileEffects == undefined) {
-						//make the client fetch profile effects
+						//hacer que el cliente busque efectos de perfil
 						await this.fetchProfileEffects("No se pudieron recuperar los efectos del perfil.");
-						//then wait for the effects to be fetched and store them
+						//luego espera a que se obtengan los efectos y guárdalos
 						this.profileEffects = Webpack.getStore("ProfileEffectStore").profileEffects;
 					} else if (this.profileEffects.length == 0) {
 						await this.fetchProfileEffects("No se pudieron recuperar los efectos del perfil.");
@@ -1051,36 +1078,36 @@ module.exports = (() => {
 
 
 					BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, [args], ret) => {
-						//error prevention
+						//prevención de errores
 						if (ret == undefined) return;
 						if (ret.bio == undefined) return;
 
-						//reveal 3y3 encoded text. this string will also include the rest of the bio
+						//revelar texto codificado 3y3. Esta cadena también incluirá el resto de la biografía.
 						let revealedText = this.secondsightifyRevealOnly(ret.bio);
 						if (revealedText == undefined) return;
 
-						//if profile effect 3y3 is detected
+						//si se detecta el efecto de perfil 3y3
 						if (revealedText.includes("/fx")) {
 							let position = revealedText.indexOf("/fx");
 							if (position == undefined) return;
 
-							//find the 2 characters after the /fx and parse int
+							//busca los 2 caracteres después de /fx y analiza int
 							let effectIndex = parseInt(revealedText.slice(position + 3, position + 5));
-							//ignore invalid data 
+							//ignorar datos no válidos
 							if (isNaN(effectIndex)) return;
-							//ignore if the profile effect id does not point to an actual profile effect
+							//ignorar si la identificación del efecto del perfil no apunta a un efecto de perfil real
 							if (profileEffectIdList[effectIndex] == undefined) return;
-							//set the profile effect
+							//establecer el efecto del perfil
 							ret.profileEffectId = profileEffectIdList[effectIndex];
 
-							//if for some reason we dont know what this user's ID is, stop here
+							//si por alguna razón no sabemos cuál es el ID de este usuario, deténgase aquí
 							if (args == undefined) return;
-							//otherwise add them to the list of users who show up with the BDNitro user badge
+							//de lo contrario, agréguelos a la lista de usuarios que aparecen con la insignia de usuario de BDNitro
 							if (!badgeUserIDs.includes(args)) badgeUserIDs.push(args);
 						}
 					}); //end of getUserProfile patch.
 
-					//wait for profile effect section renderer to be loaded.
+					//espera a que se cargue el renderizador de la sección de efectos de perfil.
 					await Webpack.waitForModule(Webpack.Filters.byStrings("initialSelectedEffectId"));
 
 					//fetch the module now that it's loaded
@@ -1176,7 +1203,6 @@ module.exports = (() => {
 					}); //end patch of profile effect section renderer function
 
 				} //End of profileFX()
-
 
 				killProfileFX() { //self explanatory
 					BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
@@ -1283,7 +1309,7 @@ module.exports = (() => {
 								sku_id: "1144003461608906824" //dummy sku id
 							}
 
-							//add user to the list of users to show with the BDNitro user badge we haven't already.
+							//add user to the list of users to show with the YABDP4Nitro user badge we haven't already.
 							if (!badgeUserIDs.includes(ret.id)) badgeUserIDs.push(ret.id);
 						}
 					}); //end of getUser patch for avatar decorations
@@ -1316,7 +1342,7 @@ module.exports = (() => {
 						ret.props.children[0].props.children.push(
 							BdApi.React.createElement("button", {
 								id: "decorationButton",
-								children: "Change Decoration [BDNitro]",
+								children: "Change Decoration [YABDP4Nitro]",
 								style: {
 									width: "100px",
 									height: "50px",
@@ -1326,7 +1352,7 @@ module.exports = (() => {
 								},
 								className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
 								onClick: () => {
-									BdApi.showConfirmationModal("Cambiar decoración de avatar (BDNitro)", BdApi.React.createElement(DecorModal));
+									BdApi.showConfirmationModal("Change Avatar Decoration (YABDP4Nitro)", BdApi.React.createElement(DecorModal));
 								}
 							})
 						);
@@ -1349,7 +1375,7 @@ module.exports = (() => {
 								clipboardTextElem.select();
 								clipboardTextElem.setSelectionRange(0, 99999);
 								document.execCommand("copy");
-								ZLibrary.Toasts.info("¡3y3 copiado al portapapeles!"); document.body.removeChild(clipboardTextElem);
+								ZLibrary.Toasts.info("3y3 copied to clipboard!"); document.body.removeChild(clipboardTextElem);
 							}
 							let child = BdApi.React.createElement("img", {
 								style: {
@@ -1389,7 +1415,6 @@ module.exports = (() => {
 					}); //end patch of profile decoration section renderer function
 
 				} //End of fakeAvatarDecorations()
-
 
 				async UploadEmote(url, channelIdLmao, msg, emoji, runs) {
 					if (emoji === undefined) {
@@ -1441,7 +1466,6 @@ module.exports = (() => {
 					}
 				}
 
-
 				//Whether we should skip the emoji bypass for a given emoji.
 				// true = skip bypass
 				// false = perform bypass
@@ -1462,7 +1486,6 @@ module.exports = (() => {
 					}
 					return false;
 				}
-
 
 				customVideoSettings() { //Unlock stream buttons, apply custom resolution and fps, and apply stream quality bypasses
 					//If you're trying to figure this shit out yourself, I recommend uncommenting the line below.
@@ -1812,7 +1835,6 @@ module.exports = (() => {
 					}
 				} //End of emojiBypass()
 
-
 				updateQuick() { //Function that runs when the resolution/fps quick menu is changed.
 					//Refer to customVideoSettings function for comments on what this all does, since this code is just a copy-paste from there.
 					const settings = BdApi.getData("BDNitro", "settings");
@@ -1880,7 +1902,6 @@ module.exports = (() => {
 						ApplicationStreamFPS.FPS_60 = 60;
 					}
 				} //End of updateQuick()
-
 
 				videoQualityModule() { //Custom Bitrates, FPS, Resolution
 					if (this.videoOptionFunctions == undefined) this.videoOptionFunctions = Webpack.getByPrototypeKeys("updateVideoQuality").prototype;
@@ -2098,7 +2119,6 @@ module.exports = (() => {
 					});
 				} //End of videoQualityModule()
 
-
 				buttonCreate() { //Creates the FPS and Resolution Swapper
 					let qualityButton = document.createElement('button');
 					qualityButton.id = 'qualityButton';
@@ -2166,7 +2186,6 @@ module.exports = (() => {
 					qualityMenu.appendChild(qualityInputFPS);
 				} //End of buttonCreate()
 
-
 				async stickerSending() {
 					if (this.stickerSendabilityModule == undefined) this.stickerSendabilityModule = Webpack.getByKeys("cO", "eb", "kl");
 
@@ -2200,7 +2219,6 @@ module.exports = (() => {
 					});
 				}
 
-
 				decodeAndApplyProfileColors() {
 					BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
 						if (ret == undefined) return;
@@ -2219,9 +2237,8 @@ module.exports = (() => {
 					});
 				}
 
-
-				//Everything that has to do with the GUI and encoding of the fake profile colors 3y3 shit.
-				//Replaced DOM manipulation with React patching 4/2/2024
+				//Todo lo que tiene que ver con la GUI y la codificación de los colores del perfil falso 3y3 mierda.
+				//Se reemplazó la manipulación del DOM con el parche de React 2/4/2024
 				async encodeProfileColors(primary, accent) {
 
 					//wait for theme color picker module to be loaded
@@ -2289,7 +2306,6 @@ module.exports = (() => {
 					});
 
 				} //End of encodeProfileColors()
-
 
 				//Commented to hell and back on 3/6/2024
 				bannerUrlDecoding() { //Decode 3y3 from profile bio and apply fake banners.
@@ -2406,7 +2422,6 @@ module.exports = (() => {
 						}
 					});
 				} //End of bannerUrlDecoding()
-
 
 				//Make buttons in profile customization settings, encode imgur URLs and copy to clipboard
 				//Documented/commented and partially rewritten to use React patching on 3/6/2024
@@ -2578,12 +2593,10 @@ module.exports = (() => {
 					});
 				}
 
-
 				onStart() {
 					PluginUpdater.checkForUpdate(this.getName(), this.getVersion(), this._config.info.github_raw);
 					this.saveAndUpdate();
 				}
-
 
 				onStop() {
 					CurrentUser.premiumType = ORIGINAL_NITRO_STATUS;
