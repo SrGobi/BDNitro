@@ -23,7 +23,7 @@ Enlace de archivo sin procesar: [BDNitro.plugin.js](https://raw.githubuserconten
 - [Fotos de perfil falsas](#fotos-de-perfil-falsas)
 - [Misceláneos](#misceláneos)
 - [Temas de cliente de Nitro](#temas-del-cliente-nitro)
-- [Eliminar la venta adicional de Screenshare Nitro](#eliminar-la venta-adicional-de-nitro-para-compartir-pantalla)
+- [Eliminar la venta adicional de Screenshare Nitro](#eliminar-la-venta-adicional-de-nitro-para-compartir-pantalla)
 - [Preguntas frecuentes e instalación (¡lea esto antes de preguntar!)](#reguntas-frecuentes)
 - [Informar problemas](#informar-problemas)
 - [Contribuir](#contribuir)
