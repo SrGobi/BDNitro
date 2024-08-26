@@ -534,34 +534,20 @@ module.exports = (() => {
 					});
 				} //End of saveAndUpdate()
 
-				experiments() {
-					if (this.hasAppliedExperiments) return;
-					//Código gentilmente robado de https://gist.github.com/MeguminSama/2cae24c9e4c335c661fa94e72235d4c4?permalink_comment_id=4952988#gistcomment-4952988
+				async experiments() {
 					try {
-						let _, a = Object.values,
-							b = "getCurrentUser",
-							c = "actionHandler",
-							d = "_actionHandlers",
-							l = "_dispatcher",
-							i = "ExperimentStore";
-						webpackChunkdiscord_app.push([
-							[Date.now()], {},
-							e => {
-								_ = e
-							}
-						]), m = a((u = a(_.c).find(e => e?.exports?.default?.[b] && e?.exports?.default?.[l]?.[d]).exports.default)[l][d]._dependencyGraph.nodes), u[b]().flags |= 1, m.find(e => "Developer" + i == e.name)[c].CONNECTION_OPEN();
-						try {
-							m.find(e => i == e.name)[c].OVERLAY_INITIALIZE({
-								user: {
-									flags: 1
-								}
-							})
-						} catch { }
-						m.find(e => i == e.name).storeDidChange()
+						let c; webpackChunkdiscord_app.push([[Symbol()], {}, r => c = r.c]); webpackChunkdiscord_app.pop();
+						let u = Object.values(c).find(x => x?.exports?.default?.getUsers).exports.default;
+						let m = Object.values(u._dispatcher._actionHandlers._dependencyGraph.nodes);
+						u.getCurrentUser().flags |= 1;
+						m.find((x) => x.name === "DeveloperExperimentStore").actionHandler["CONNECTION_OPEN"]();
+						try { m.find((x) => x.name === "ExperimentStore").actionHandler["OVERLAY_INITIALIZE"]({ user: { flags: 1 } }) } catch { };
+						m.find((x) => x.name === "ExperimentStore").storeDidChange();
 					} catch (err) {
-						//console.warn(err);
+						console.log(err);
+						BdApi.showNotice("[BDNitro] An error occurred with the DiscordExperiments plugin"), { type: "error", buttons: [{ label: "Issue", onClick: () => window.open("https://github.com/srgobi/DBNitro/issues", "mozillaTab") }] };
+						return BdApi.showNotice("[BDNitro] Error: %error%", { type: "error", buttons: [{ label: "Report", onClick: () => window.open("https://github.com/srgobi/DBNitro/issues", "mozillaTab") }] });
 					}
-
 				}
 
 				clientThemes() {
@@ -996,8 +982,6 @@ module.exports = (() => {
 						for (let i = 0; i < ret.badges.length; i++) {
 							badgesList.push(ret.badges[i].id); // Agregar cada una de las ID de insignia de este usuario a BadgesList
 						}
-
-						console.log(badgeUserIDs);
 
 						// Añadir insignias personalizadas a la lista si no están ya presentes
 						if (badgeUserIDs.includes(ret.userId) && !badgesList.includes("bd_user")) {
@@ -2639,6 +2623,7 @@ module.exports = (() => {
 					BdApi.DOM.removeStyle("BDNitroBadges");
 					BdApi.DOM.removeStyle("UsrBGIntegration");
 					usrBgUsers = [];
+					BdApi.showNotice("Debes reiniciar BetterDiscord para deshabilitar DiscordExperiments", { type: "warning", buttons: [{ label: "Reinicia BetterDiscord", onClick: () => location.reload() }] });
 				}
 			};
 		};
