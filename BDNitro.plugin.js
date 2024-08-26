@@ -565,119 +565,142 @@ module.exports = (() => {
 				}
 
 				clientThemes() {
+					console.log("[GradientTheme] Inicializando clientThemes");
 					if (this.clientThemesModule == undefined) this.clientThemesModule = Webpack.getModule(Webpack.Filters.byProps("isPreview"));
 
-					//Eliminar la propiedad isPreview para que podamos configurar la nuestra
 					delete this.clientThemesModule.isPreview;
 
-					//Esta propiedad básicamente desbloquea los botones del tema del cliente
-					Object.defineProperty(this.clientThemesModule, "isPreview", { //Habilitar la configuración del tema nitro
+					Object.defineProperty(this.clientThemesModule, "isPreview", {
 						value: false,
 						configurable: true,
 						enumerable: true,
 						writable: true,
 					});
 
-					if (this.themesModule == undefined) this.themesModule = Webpack.getByKeys("V1", "ZI")
+					if (this.themesModule == undefined) this.themesModule = Webpack.getByKeys("V1", "ZI");
 
 					if (this.gradientSettingModule == undefined) this.gradientSettingModule = Webpack.getByKeys("kj", "zO");
 					const resetPreviewClientTheme = this.gradientSettingModule.kj;
 					const updateBackgroundGradientPreset = this.gradientSettingModule.zO;
 
-					//Parcheando la función saveClientTheme.
-					BdApi.Patcher.instead(this.getName(), this.themesModule, "ZI", (_, [args]) => {
-						if (args.backgroundGradientPresetId == undefined) {
-
-							//Si este número es -1, eso le indica al complemento que el tema actual que estamos configurando no es un tema nitro degradado.
-							this.settings.lastGradientSettingStore = -1;
-							//Guardar cualquier cambio en la configuración
-							Utilities.saveSettings(this.getName(), this.settings);
-
-							//si el usuario intenta configurar el tema en el tema oscuro predeterminado
-							if (args.theme == 'dark') {
-								//Actualización de la configuración de envío para cambiar al tema oscuro.
-								Dispatcher.dispatch({
-									type: "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE",
-									changes: {
-										appearance: {
-											shouldSync: false,
-											settings: {
-												theme: 'dark', //default dark theme
-												developerMode: true //Realmente no tengo idea de lo que esto hace.
-											}
-										}
-									}
-								})
-								//deshazte de la temática gradiente.
-								resetPreviewClientTheme();
-								return;
-							}
-
-							//si el usuario está intentando configurar el tema en el tema claro predeterminado
-							if (args.theme == 'light') {
-								//enviar evento de actualización de configuración para cambiar al tema claro
-								Dispatcher.dispatch({
-									type: "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE",
-									changes: {
-										appearance: {
-											shouldSync: false,  //evitar la sincronización para evitar que la API de Discord entre
-											settings: {
-												theme: 'light', //default light theme
-												developerMode: true
-											}
-										}
-									}
-								})
-							}
-							return;
-						} else { //gradient themes
-							//Almacene la última configuración de degradado utilizada en la configuración
-							this.settings.lastGradientSettingStore = args.backgroundGradientPresetId;
-							//guardar cualquier cambio en la configuración
-							Utilities.saveSettings(this.getName(), this.settings);
-
-							//enviar evento de actualización de configuración para cambiar al gradiente que eligió el usuario
+					// Función para aplicar el tema y el degradado almacenados
+					const applyStoredTheme = () => {
+						console.log("[GradientTheme] Aplicar tema almacenado");
+						if (this.settings.lastGradientSettingStore !== -1) {
+							console.log(`[GradientTheme] Applying gradient preset: ${this.settings.lastGradientSettingStore}`);
+							updateBackgroundGradientPreset(this.settings.lastGradientSettingStore);
 							Dispatcher.dispatch({
 								type: "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE",
 								changes: {
 									appearance: {
-										shouldSync: false,  //evitar la sincronización para evitar que la API de Discord entre
+										shouldSync: false,
 										settings: {
-											theme: args.theme, //Los temas degradados se basan en oscuros o claros, args.theme almacena esta información
+											theme: this.settings.lastTheme || 'dark',
 											clientThemeSettings: {
-												backgroundGradientPresetId: args.backgroundGradientPresetId //ID preestablecido para el tema degradado
+												backgroundGradientPresetId: this.settings.lastGradientSettingStore
 											},
 											developerMode: true
 										}
 									}
 								}
 							});
-
-							//actualice el degradado de fondo preestablecido al que acaba de elegir.
-							updateBackgroundGradientPreset(this.settings.lastGradientSettingStore);
+						} else {
+							console.log("[GradientTheme] No hay ningún tema degradado almacenado");
 						}
-					}); //Fin del parche saveClientTheme.
+					};
 
+					// Parcheando la función saveClientTheme.
+					BdApi.Patcher.instead(this.getName(), this.themesModule, "ZI", (_, [args]) => {
+						console.log("[GradientTheme] Guardando el tema del cliente", args);
+						if (args.backgroundGradientPresetId == undefined) {
+							this.settings.lastGradientSettingStore = -1;
+							this.settings.lastTheme = args.theme;
+						} else {
+							this.settings.lastGradientSettingStore = args.backgroundGradientPresetId;
+							this.settings.lastTheme = args.theme;
+						}
+						Utilities.saveSettings(this.getName(), this.settings);
 
-					//Si la última elección de apariencia fuera un tema de cliente nitro
-					if (this.settings.lastGradientSettingStore != -1) {
+						Dispatcher.dispatch({
+							type: "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE",
+							changes: {
+								appearance: {
+									shouldSync: false,
+									settings: {
+										theme: args.theme,
+										clientThemeSettings: args.backgroundGradientPresetId ? {
+											backgroundGradientPresetId: args.backgroundGradientPresetId
+										} : undefined,
+										developerMode: true
+									}
+								}
+							}
+						});
 
-						//Esta línea establece el gradiente al guardar y cargar el complemento.
-						updateBackgroundGradientPreset(this.settings.lastGradientSettingStore);
-					}
+						if (args.backgroundGradientPresetId) {
+							updateBackgroundGradientPreset(args.backgroundGradientPresetId);
+						} else if (args.theme === 'dark') {
+							resetPreviewClientTheme();
+						}
+					});
+
+					// Aplicar el tema almacenado al iniciar el complemento
+					applyStoredTheme();
 
 					if (this.accountSwitchModule == undefined) this.accountSwitchModule = Webpack.getByKeys("startSession");
 
-					//parche de inicio de sesión. Esta función se ejecuta al cambiar de cuenta.
+					// Parche startSession para aplicar el tema después del cambio de cuenta
 					BdApi.Patcher.after(this.getName(), this.accountSwitchModule, "startSession", () => {
-
-						//Si la última elección de apariencia fuera un tema de cliente nitro
-						if (this.settings.lastGradientSettingStore != -1) {
-							//Restaurar gradiente al cambiar de cuenta
-							updateBackgroundGradientPreset(this.settings.lastGradientSettingStore);
-						}
+						console.log("[GradientTheme] Se detectó un cambio de cuenta");
+						// Aplicar el tema inmediatamente y luego periódicamente durante los próximos 10 segundos
+						applyStoredTheme();
+						let attempts = 0;
+						const interval = setInterval(() => {
+							if (attempts < 10) {
+								console.log(`[GradientTheme] Volviendo a aplicar el tema, intente ${attempts + 1}`);
+								applyStoredTheme();
+								attempts++;
+							} else {
+								clearInterval(interval);
+							}
+						}, 1000);
 					});
-				} //Fin de clientThemes()
+
+					// Observa los cambios en el cuerpo del documento para detectar cambios en el tema.
+					const observer = new MutationObserver((mutations) => {
+						mutations.forEach((mutation) => {
+							if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+								const bodyClasses = document.body.className;
+								if (bodyClasses.includes('theme-dark') || bodyClasses.includes('theme-light')) {
+									console.log("[GradientTheme] Cambio de tema detectado");
+									// El tema ha cambiado, reaplica nuestro tema almacenado
+									setTimeout(applyStoredTheme, 100);
+								}
+							}
+						});
+					});
+
+					observer.observe(document.body, { attributes: true });
+
+					// Verificación periódica para garantizar que se aplica el tema
+					const periodicCheck = setInterval(() => {
+						console.log("[GradientTheme] Realización de comprobaciones periódicas");
+						if (this.settings.lastGradientSettingStore !== -1) {
+							const currentGradient = document.body.style.backgroundImage;
+							if (!currentGradient || !currentGradient.includes('linear-gradient')) {
+								console.log("[GradientTheme] Degradado no detectado, reaplicándose");
+								applyStoredTheme();
+							}
+						}
+					}, 5000);
+
+					// Limpiar cuando se detiene el complemento
+					return () => {
+						console.log("[GradientTheme] Limpiando");
+						observer.disconnect();
+						clearInterval(periodicCheck);
+					};
+				}
 
 				customProfilePictureDecoding() {
 					if (this.getAvatarUrlModule == undefined) this.getAvatarUrlModule = Webpack.getByPrototypeKeys("getAvatarURL").prototype;
@@ -1309,7 +1332,7 @@ module.exports = (() => {
 								sku_id: "1144003461608906824" //dummy sku id
 							}
 
-							//add user to the list of users to show with the YABDP4Nitro user badge we haven't already.
+							//add user to the list of users to show with the BDNitro user badge we haven't already.
 							if (!badgeUserIDs.includes(ret.id)) badgeUserIDs.push(ret.id);
 						}
 					}); //end of getUser patch for avatar decorations
@@ -1342,7 +1365,7 @@ module.exports = (() => {
 						ret.props.children[0].props.children.push(
 							BdApi.React.createElement("button", {
 								id: "decorationButton",
-								children: "Change Decoration [YABDP4Nitro]",
+								children: "Change Decoration [BDNitro]",
 								style: {
 									width: "100px",
 									height: "50px",
@@ -1352,7 +1375,7 @@ module.exports = (() => {
 								},
 								className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
 								onClick: () => {
-									BdApi.showConfirmationModal("Change Avatar Decoration (YABDP4Nitro)", BdApi.React.createElement(DecorModal));
+									BdApi.showConfirmationModal("Change Avatar Decoration (BDNitro)", BdApi.React.createElement(DecorModal));
 								}
 							})
 						);
