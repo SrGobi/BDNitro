@@ -77,10 +77,10 @@ module.exports = (() => {
 			{
 				title: "5.4.6",
 				items: [
+					"Se corrigió el metodo de experimentos para que funcione correctamente.",
+					"Se añadió mejor soporte para el manejo de errrores y recarga de la aplicación.",
 					"Se corrigió la prioridad de los badges en el perfil.",
 					"Se implementaron todos los badges actuales de Discord, ahora puedes añadir todos los badges que quieras.",
-					"Se modificó la implementación de UsrBg para que esté más cerca de la implementación original.",
-					"Se simplificó algún código relacionado con los estilos.",
 					"Se corrigieron los temas de gradiente que se eliminan después de la recarga."
 				]
 			}
