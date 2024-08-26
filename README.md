@@ -9,33 +9,31 @@ Enlace de archivo sin procesar: [BDNitro.plugin.js](https://raw.githubuserconten
 ## Tabla de contenido:
 
 - [Características](#características)
-- [Pantalla compartida personalizada, FPS, tasa de bits](#calidad-de-pantalla-compartida-completamente-personalizable-fps-y-tasa-de-bits)
-- [Omisiones de emojis](#omisiones-de-emojis)
+- [Pantalla compartida personalizada, FPS, tasa de bits](#calidad-de-pantalla-compartida-fps-y-tasa-de-bits)
+- [Omisiones de emojis](#omisión-de-emojis)
 - [Cargar emoticones](#cargar-emoticones)
 - [Modo fantasma](#modo-fantasma)
-- [Modo clásico](#modo-clasico)
+- [Modo clásico](#modo-clásico)
 - [Perfil](#perfil)
 - [Acentos de perfil para todos los usuarios](#acentos-de-perfil-para-todos-los-usuarios)
-- [Temas de perfil falso](#temas-de-perfil-falso)
-- [Perfil falso Banners](#fake-profile-banners)
-- [Decoraciones de avatar falsas](#fake-avatar-decorations)
-- [Efectos de perfil falso](#fake-profile-effects)
-- [Imágenes de perfil falsas](#fake-profile-pictures)
-- [Varios](#miscellaneous)
-- [Temas de cliente de Nitro](#nitro-client-themes)
-- [Eliminar la venta adicional de Screenshare Nitro](#remove-screenshare-nitro-upsell)
-- [Preguntas frecuentes e instalación (¡lea esto antes de preguntar!)](#frequently-asked-questions)
-- [Informar problemas](#reporting-issues)
-- [Contribuir](#contributing)
-- [Agradecimientos especiales](#contributors)
+- [Temas de perfil falsos](#temas-de-perfil-falsos)
+- [Temas de banners falsos](#temas-de-banners-falsos)
+- [Decoraciones de avatar falsos](#decoraciones-de-avatar-falsos)
+- [Efectos de perfil falsos](#efectos-de-perfil-falsos)
+- [Fotos de perfil falsas](#fotos-de-perfil-falsas)
+- [Misceláneos](#misceláneos)
+- [Temas de cliente de Nitro](#temas-del-cliente-nitro)
+- [Eliminar la venta adicional de Screenshare Nitro](#eliminar-la venta-adicional-de-nitro-para-compartir-pantalla)
+- [Preguntas frecuentes e instalación (¡lea esto antes de preguntar!)](#reguntas-frecuentes)
+- [Informar problemas](#informar-problemas)
+- [Contribuir](#contribuir)
+- [Agradecimientos especiales](#colaboradores)
 - [Complementos adicionales para recomendar](#complementos-adicionales-recomendados-para-más-funciones-de-nitro)
 - [Acuerdo de licencia](#licencia)
-- [Servidor de Discord](#servidor-de-discord)
-- [Donar](#donar)
 
 ## Características
 
-## Calidad de pantalla compartida, FPS y tasa de bits totalmente personalizables
+## Calidad de pantalla compartida, FPS y tasa de bits
 
 ¡Transmite en cualquier resolución, tasa de cuadros y tasa de bits que quieras! ¿Quién necesita Nitro?
 
@@ -100,7 +98,7 @@ Funciona de manera efectiva exactamente igual que FakeProfileThemes en Vencord, 
 
 ---
 
-### Banners de perfil falsos
+### Temas de banners falsos
 
 Utiliza una codificación 3y3 invisible para permitir la configuración de banners de perfil ocultando la URL de la imagen en tu biografía.<br>
 Solo admite URL de Imgur por razones de seguridad.
@@ -120,11 +118,11 @@ El banner debería aparecer en la vista previa de "Pruébalo" para informarte qu
 
 ---
 
-### Decoraciones de avatar falsas
+### Decoraciones de avatar falsos
 
 Usa la codificación 3y3 invisible para permitir configurar decoraciones de avatar ocultando las identificaciones en tu biografía o estado personalizado.
 
-Para usar decoraciones de avatar falsas, ve a Configuración>Perfiles y deberías ver un nuevo botón debajo de Decoración de avatar.
+Para usar decoraciones de avatar falsos, ve a Configuración>Perfiles y deberías ver un nuevo botón debajo de Decoración de avatar.
 
 ![deco-button](https://github-production-user-asset-6210df.s3.amazonaws.com/54255074/273400010-0b5547e0-2947-4628-a3da-a91f9ee1c933.png)
 
@@ -220,7 +218,25 @@ Ten en cuenta que solo otras personas del complemento podrán ver tu foto de per
 
 ---
 
-## Varios
+### Misceláneos
+
+- **Cambiar PremiumType**  
+  Esto ahora es opcional. Habilitar esto puede ayudar con la compatibilidad en ciertas situaciones o dañarla. SimpleDiscordCrypt requiere que esto esté habilitado para que funcione la omisión de emojis. Habilítelo solo si no tiene Nitro.
+
+- **Temas de cliente degradados**  
+  Permite utilizar temas de cliente exclusivos para usuarios de Nitro.
+
+- **Eliminar venta adicional de personalización del perfil**  
+  Elimina la venta adicional "Pruébalo" en la pantalla de personalización del perfil y la reemplaza con la variante de Nitro. *Nota: esto no habilita la personalización de Nitro en perfiles de servidor ya que la API no lo permite.*
+
+- **Eliminar venta adicional de Screen Share Nitro**  
+  Elimina la promoción de Nitro en el menú de opciones de calidad de Screen Share.
+
+- **Iconos de aplicaciones**  
+  Desbloquea iconos de aplicaciones. *Advertencia: habilitar esta opción forzará la activación de "Cambiar tipo premium".*
+
+- **Experimentos**  
+  Desbloquea experimentos en Discord. Úselo bajo su propia responsabilidad.
 
 ### Temas del cliente Nitro
 
