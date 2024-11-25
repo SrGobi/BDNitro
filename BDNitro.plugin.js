@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.4.6
+ * @version 5.5.8
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @updateUrl https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js
@@ -31,7 +31,7 @@
 @else@*/
 
 //#region 
-const { Webpack } = BdApi;
+const { Webpack, Patcher, Net, React } = BdApi;
 const StreamButtons = Webpack.getByKeys("L9", "LY", "ND", "WC", "aW", "af");
 const ApplicationStreamResolutions = StreamButtons.LY;
 const ApplicationStreamSettingRequirements = StreamButtons.ND;
@@ -53,10 +53,14 @@ let downloadedUserProfiles = [];
 const userProfileMod = Webpack.getByKeys("getUserProfile");
 const buttonClassModule = Webpack.getByKeys("lookFilled", "button", "contents");
 const Dispatcher = Webpack.getByKeys("subscribe", "dispatch");
-const canUserUseMod = Webpack.getByKeys("canUserUse");
+const canUserUseMod = Webpack.getByKeys("$0", "ks");
 const AvatarDefaults = Webpack.getByKeys("getEmojiURL");
-const LadderModule = BdApi.Webpack.getModule(BdApi.Webpack.Filters.byProps("calculateLadder"), { searchExports: true });
-const FetchCollectibleCategories = BdApi.Webpack.getByKeys("B1", "DR", "F$", "K$").F$
+const LadderModule = Webpack.getModule(Webpack.Filters.byProps("calculateLadder"), { searchExports: true });
+const FetchCollectibleCategories = Webpack.getByKeys("B1", "DR", "F$", "K$").F$;
+let ffmpeg = undefined;
+const MP4Box = Webpack.getByKeys("MP4BoxStream");
+const udta = new Uint8Array([0, 0, 0, 89, 109, 101, 116, 97, 0, 0, 0, 0, 0, 0, 0, 33, 104, 100, 108, 114, 0, 0, 0, 0, 0, 0, 0, 0, 109, 100, 105, 114, 97, 112, 112, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 105, 108, 115, 116, 0, 0, 0, 36, 169, 116, 111, 111, 0, 0, 0, 28, 100, 97, 116, 97, 0, 0, 0, 1, 0, 0, 0, 0, 76, 97, 118, 102, 54, 49, 46, 51, 46, 49, 48, 51, 0, 0, 46, 46, 117, 117, 105, 100, 161, 200, 82, 153, 51, 70, 77, 184, 136, 240, 131, 245, 122, 117, 165, 239]);
+const udtaBuffer = udta.buffer;
 //#endregion
 
 module.exports = (() => {
@@ -68,20 +72,17 @@ module.exports = (() => {
 				"discord_id": "359063827091816448",
 				"github_username": "srgobi"
 			}],
-			"version": "5.4.6",
-			"description": "¡Desbloquea todos los modos de compartir pantalla y usa gestos GIF y entre servidores!",
+			"version": "5.5.8",
+			"description": "Unlock all screensharing modes, and use cross-server & GIF emotes!",
 			"github": "https://github.com/srgobi/BDNitro",
 			"github_raw": "https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js"
 		},
 		changelog: [
 			{
-				title: "5.4.6",
+				title: "5.5.8",
 				items: [
-					"Se corrigió el metodo de experimentos para que funcione correctamente.",
-					"Se añadió mejor soporte para el manejo de errrores y recarga de la aplicación.",
-					"Se corrigió la prioridad de los badges en el perfil.",
-					"Se implementaron todos los badges actuales de Discord, ahora puedes añadir todos los badges que quieras.",
-					"Se corrigieron los temas de gradiente que se eliminan después de la recarga."
+					"Attempt to workaround a Discord bug -- tried to fix some animated emoji links not appearing as animated"
+
 				]
 			}
 		],
@@ -105,12 +106,13 @@ module.exports = (() => {
 			return config.info.version;
 		}
 		load() {
-			BdApi.UI.showConfirmationModal("Falta la biblioteca", `Falta el complemento de biblioteca necesario para ${config.info.name}. Haga clic en Descargar ahora para instalarlo.`, {
-				confirmText: "Descargar ahora",
-				cancelText: "Cancelar",
+			BdApi.UI.showConfirmationModal("Library Missing", `The library plugin needed for ${config.info.name} is missing. Please click Download Now to install it.`, {
+				confirmText: "Download Now",
+				cancelText: "Cancel",
 				onConfirm: () => {
-					require("request").get("https://rauenzi.github.io/BDPluginLibrary/release/0PluginLibrary.plugin.js", async (error, response, body) => {
-						if (error) return require("electron").shell.openExternal("https://raw.githubusercontent.com/rauenzi/BDPluginLibrary/master/release/0PluginLibrary.plugin.js");
+					Net.fetch("https://raw.githubusercontent.com/zerebos/BDPluginLibrary/master/release/0PluginLibrary.plugin.js", { method: "GET" }).then(async res => {
+						if (!res.ok) return require("electron").shell.openExternal("https://raw.githubusercontent.com/zerebos/BDPluginLibrary/master/release/0PluginLibrary.plugin.js");
+						let body = await res.text();
 						await new Promise(r => require("fs").writeFile(require("path").join(BdApi.Plugins.folder, "0PluginLibrary.plugin.js"), body, r));
 					});
 				}
@@ -163,7 +165,7 @@ module.exports = (() => {
 					"profileV2": false,
 					"forceStickersUnlocked": false,
 					"changePremiumType": false,
-					"videoCodec": 0,
+					// "videoCodec": 0,
 					"clientThemes": true,
 					"lastGradientSettingStore": -1,
 					"fakeProfileThemes": true,
@@ -178,7 +180,10 @@ module.exports = (() => {
 					"customPFPs": true,
 					"experiments": false,
 					"userPfpIntegration": true,
-					"userBgIntegration": true
+					"userBgIntegration": true,
+					"useClipBypass": true,
+					"alwaysTransmuxClips": false,
+					"forceClip": false
 				};
 				settings = Utilities.loadSettings(this.getName(), this.defaultSettings);
 				getSettingsPanel() {
@@ -194,53 +199,54 @@ module.exports = (() => {
 							new Settings.Switch("Nitro", "Desbloquea el badge de Nitro", this.settings.NITRO, value => this.settings.NITRO = value),
 							new Settings.Switch("Early Supporter", "Desbloquea el badge de Early Supporter", this.settings.early_supporter, value => this.settings.early_supporter = value)
 						]),
-						new Settings.SettingGroup("Funciones para compartir pantalla").append(...[
-							new Settings.Switch("Compartir pantalla de alta calidad", "Compartir pantalla 1080p/Fuente a 60 fps. Habilítelo si desea utilizar alguna opción relacionada con Compartir pantalla.", this.settings.screenSharing, value => this.settings.screenSharing = value),
-							new Settings.Switch("Resolución de pantalla compartida personalizada", "¡Elija su propia resolución de pantalla compartida!", this.settings.ResolutionEnabled, value => this.settings.ResolutionEnabled = value),
-							new Settings.Textbox("Resolución", "La resolución personalizada que desees (en píxeles)", this.settings.CustomResolution,
+						new Settings.SettingGroup("Screen Share Features").append(...[
+							new Settings.Switch("High Quality Screensharing", "1080p/Source @ 60fps screensharing. Enable if you want to use any Screen Share related options.", this.settings.screenSharing, value => this.settings.screenSharing = value),
+							new Settings.Switch("Custom Screenshare Resolution", "Choose your own screen share resolution!", this.settings.ResolutionEnabled, value => this.settings.ResolutionEnabled = value),
+							new Settings.Textbox("Resolution", "The custom resolution you want (in pixels)", this.settings.CustomResolution,
 								value => {
 									value = parseInt(value, 10);
 									this.settings.CustomResolution = value;
 								}),
-							new Settings.Switch("FPS compartido de pantalla personalizado", "¡Elige tu propio FPS compartido de pantalla!", this.settings.CustomFPSEnabled, value => this.settings.CustomFPSEnabled = value),
+							new Settings.Switch("Custom Screenshare FPS", "Choose your own screen share FPS!", this.settings.CustomFPSEnabled, value => this.settings.CustomFPSEnabled = value),
 							new Settings.Textbox("FPS", "", this.settings.CustomFPS,
 								value => {
 									value = parseInt(value);
 									this.settings.CustomFPS = value;
 								}),
-							new Settings.Switch("Stream Settings Quick Swapper", "¡Agrega un botón que te permitirá cambiar tu resolución rápidamente!", this.settings.ResolutionSwapper, value => this.settings.ResolutionSwapper = value),
-							new Settings.Switch("Tasa de bits personalizada", "¡Elija la tasa de bits para sus transmisiones!", this.settings.CustomBitrateEnabled, value => this.settings.CustomBitrateEnabled = value),
-							new Settings.Textbox("Velocidad de bits mínima", "La velocidad de bits mínima (en kbps). Si se establece en un número negativo, se utilizará el valor predeterminado de Discord de 150 kbps.", this.settings.minBitrate,
+							new Settings.Switch("Stream Settings Quick Swapper", "Adds a button that will let you switch your resolution quickly!", this.settings.ResolutionSwapper, value => this.settings.ResolutionSwapper = value),
+							new Settings.Switch("Custom Bitrate", "Choose the bitrate for your streams!", this.settings.CustomBitrateEnabled, value => this.settings.CustomBitrateEnabled = value),
+							new Settings.Textbox("Minimum Bitrate", "The minimum bitrate (in kbps). If this is set to a negative number, the Discord default of 150kbps will be used.", this.settings.minBitrate,
 								value => {
 									value = parseFloat(value);
 									this.settings.minBitrate = value;
 								}),
-							new Settings.Textbox("Velocidad de bits máxima", "La velocidad de bits máxima (en kbps). Si se establece en un número negativo, se utilizará el valor predeterminado de Discord de 600 kbps.", this.settings.maxBitrate,
-								value => {
-									value = parseFloat(value);
-									this.settings.maxBitrate = value;
-								}),
-							new Settings.Textbox("Velocidad de bits objetivo", "La velocidad de bits objetivo (en kbps). Si se establece en un número negativo, se utilizará el valor predeterminado de Discord de 2500 kbps.", this.settings.targetBitrate,
+							new Settings.Textbox("Target Bitrate", "The target bitrate (in kbps). If this is set to a negative number, the Discord default of 600kbps will be used.", this.settings.targetBitrate,
 								value => {
 									value = parseFloat(value);
 									this.settings.targetBitrate = value;
 								}),
-							new Settings.Textbox("Voz Audio Bitrate", "Le permite cambiar la velocidad de bits de voz a lo que desee. No le permite superar la velocidad de bits establecida del canal de voz, pero sí le permite bajar mucho más (tasa de bits en kbps).", this.settings.voiceBitrate,
+							new Settings.Textbox("Maximum Bitrate", "The maximum bitrate (in kbps). If this is set to a negative number, the Discord default of 2500kbps will be used.", this.settings.maxBitrate,
+								value => {
+									value = parseFloat(value);
+									this.settings.maxBitrate = value;
+								}),
+							new Settings.Textbox("Voice Audio Bitrate", "Allows you to change the voice bitrate to whatever you want. Does not allow you to go over the voice channel's set bitrate but it does allow you to go much lower. (bitrate in kbps).", this.settings.voiceBitrate,
 								value => {
 									value = parseFloat(value);
 									this.settings.voiceBitrate = value;
-								}),
-							new Settings.Dropdown("Códec de vídeo preferido", "Cambia el códec de vídeo para compartir pantalla al establecido.", this.settings.videoCodec, [
+								})/* ,
+							new Settings.Dropdown("Preferred Video Codec", "Changes the screen share video codec to the one set.", this.settings.videoCodec, [
 								{ label: "Default/Disabled", value: 0 },
 								{ label: "H.265", value: 1 },
 								{ label: "H.264", value: 2 },
-								{ label: "VP8", value: 3 },
-								{ label: "VP9", value: 4 }], value => this.settings.videoCodec = value, { searchable: true }
-							)
+								{ label: "AV1", value: 3 },
+								{ label: "VP8", value: 4 },
+								{ label: "VP9", value: 5 }], value => this.settings.videoCodec = value, { searchable: true }
+							) */
 						]),
 						new Settings.SettingGroup("Emojis").append(
-							new Settings.Switch("Nitro Emotes Bypass", "Habilitar o deshabilitar el uso de la omisión de emoji.", this.settings.emojiBypass, value => this.settings.emojiBypass = value),
-							new Settings.Dropdown("Tamaño", "El tamaño del emoji en píxeles.", this.settings.emojiSize, [
+							new Settings.Switch("Nitro Emotes Bypass", "Enable or disable using the emoji bypass.", this.settings.emojiBypass, value => this.settings.emojiBypass = value),
+							new Settings.Dropdown("Size", "The size of the emoji in pixels.", this.settings.emojiSize, [
 								{ label: "32px (Default small/inline)", value: 32 },
 								{ label: "48px (Recommended, default large)", value: 48 },
 								{ label: "16px", value: 16 },
@@ -260,43 +266,45 @@ module.exports = (() => {
 									this.settings.emojiSize = value
 								}, { searchable: true }
 							),
-							new Settings.Switch("Modo fantasma", "Abusa del error de mensaje fantasma para ocultar la URL del emoji.", this.settings.ghostMode, value => this.settings.ghostMode = value),
-							new Settings.Switch("No use la omisión de emoji si el gesto está desbloqueado", "Desactive para usar la omisión de emoji incluso si no es necesario omitir para ese emoji.", this.settings.emojiBypassForValidEmoji, value => this.settings.emojiBypassForValidEmoji = value),
-							new Settings.Switch("Utilice PNG en lugar de WEBP", "¡Utilice la versión PNG de emoji para obtener mayor calidad!", this.settings.PNGemote, value => this.settings.PNGemote = value),
-							new Settings.Switch("Cargar gestos como imágenes", "Cargar gestos como imágenes después de enviar el mensaje. (Anula la vinculación de gestos)", this.settings.uploadEmotes, value => this.settings.uploadEmotes = value),
-							new Settings.Switch("Sticker Bypass", "Habilita o deshabilita el uso de la omisión de stickers. Recomiendo usar DiscordFreeStickers de An00nymushun sobre esto. Los stickers animados APNG/WEBP/Lottie no se animarán.", this.settings.stickerBypass, value => this.settings.stickerBypass = value),
-							new Settings.Switch("Subir stickers", "Subir stickers de la misma manera que los emoticonos.", this.settings.uploadStickers, value => this.settings.uploadStickers = value),
-							new Settings.Switch("Forzar el desbloqueo de stickers", "Habilitar para que se desbloqueen los stickers.", this.settings.forceStickersUnlocked, value => this.settings.forceStickersUnlocked = value)
+							new Settings.Switch("Ghost Mode", "Abuses ghost message bug to hide the emoji url.", this.settings.ghostMode, value => this.settings.ghostMode = value),
+							new Settings.Switch("Don't Use Emote Bypass if Emote is Unlocked", "Disable to use emoji bypass even if bypass is not required for that emoji.", this.settings.emojiBypassForValidEmoji, value => this.settings.emojiBypassForValidEmoji = value),
+							new Settings.Switch("Use PNG instead of WEBP", "Use the PNG version of emoji for higher quality!", this.settings.PNGemote, value => this.settings.PNGemote = value),
+							new Settings.Switch("Upload Emotes as Images", "Upload emotes as image(s) after message is sent. (Overrides linking emotes)", this.settings.uploadEmotes, value => this.settings.uploadEmotes = value),
+							new Settings.Switch("Sticker Bypass", "Enable or disable using the sticker bypass. I recommend using An00nymushun's DiscordFreeStickers over this. Animated APNG/WEBP/Lottie Stickers will not animate.", this.settings.stickerBypass, value => this.settings.stickerBypass = value),
+							new Settings.Switch("Upload Stickers", "Upload stickers in the same way as emotes.", this.settings.uploadStickers, value => this.settings.uploadStickers = value),
+							new Settings.Switch("Force Stickers Unlocked", "Enable to cause Stickers to be unlocked.", this.settings.forceStickersUnlocked, value => this.settings.forceStickersUnlocked = value)
 						),
-						new Settings.SettingGroup("Perfil").append(
-							new Settings.Switch("Acentos de perfil", "Cuando está habilitado, verá (casi) todos los usuarios con el nuevo aspecto exclusivo de Nitro para los perfiles (el aspecto más sexy). Cuando está deshabilitado, se utiliza el comportamiento predeterminado. No le permite actualizar el acento de su perfil.", this.settings.profileV2, value => this.settings.profileV2 = value),
-							new Settings.Switch("Temas de perfiles falsos", "Utiliza codificación invisible 3y3 para permitir temas de perfil ocultando los colores en tu biografía.", this.settings.fakeProfileThemes, value => this.settings.fakeProfileThemes = value),
-							new Settings.Switch("Banners de perfil falsos", "Utiliza codificación invisible 3y3 para permitir configurar banners de perfil ocultando la URL de la imagen en su biografía. Solo admite URL de Imgur por razones de seguridad.", this.settings.fakeProfileBanners, value => this.settings.fakeProfileBanners = value),
-							new Settings.Switch("Integración de UserBG", "Descarga y analiza la base de datos JSON de UserBG para que aparezcan los banners de UserBG.", this.settings.userBgIntegration, value => this.settings.userBgIntegration = value),
-							new Settings.Switch("Decoraciones de avatar falsas", "Utiliza codificación invisible 3y3 para permitir configurar decoraciones de avatar ocultando información en su biografía y/o su estado personalizado.", this.settings.fakeAvatarDecorations, value => this.settings.fakeAvatarDecorations = value),
-							new Settings.Switch("Efectos de perfil falsos", "Utiliza codificación invisible 3y3 para permitir configurar efectos de perfil ocultando información en su biografía.", this.settings.profileEffects, value => this.settings.profileEffects = value),
-							new Settings.Switch("Eliminar efectos de perfil", "¿Odias los efectos de perfil? Habilítalo y desaparecerán. Todos. Anula todos los efectos de perfil.", this.settings.killProfileEffects, value => this.settings.killProfileEffects = value),
-							new Settings.Switch("Imágenes de perfil falsas", "Utiliza codificación invisible 3y3 para permitir configurar imágenes de perfil personalizadas ocultando la URL de una imagen EN SU ESTADO PERSONALIZADO. Solo admite URL de Imgur por razones de seguridad.", this.settings.customPFPs, value => this.settings.customPFPs = value),
-							new Settings.Switch("Integración UserPFP", "Importa la base de datos UserPFP para que las personas que tienen imágenes de perfil en la base de datos UserPFP aparezcan con su imagen de perfil UserPFP. Hay pocas razones para desactivar esto.", this.settings.userPfpIntegration, value => this.settings.userPfpIntegration = value)
+						new Settings.SettingGroup("Profile").append(
+							new Settings.Switch("Profile Accents", "When enabled, you will see (almost) all users with the new Nitro-exclusive look for profiles (the sexier look). When disabled, the default behavior is used. Does not allow you to update your profile accent.", this.settings.profileV2, value => this.settings.profileV2 = value),
+							new Settings.Switch("Fake Profile Themes", "Uses invisible 3y3 encoding to allow profile theming by hiding the colors in your bio.", this.settings.fakeProfileThemes, value => this.settings.fakeProfileThemes = value),
+							new Settings.Switch("Fake Profile Banners", "Uses invisible 3y3 encoding to allow setting profile banners by hiding the image URL in your bio. Only supports Imgur URLs for security reasons.", this.settings.fakeProfileBanners, value => this.settings.fakeProfileBanners = value),
+							new Settings.Switch("UserBG Integration", "Downloads and parses the UserBG JSON database so that UserBG banners will appear for you.", this.settings.userBgIntegration, value => this.settings.userBgIntegration = value),
+							new Settings.Switch("Fake Avatar Decorations", "Uses invisible 3y3 encoding to allow setting avatar decorations by hiding information in your bio and/or your custom status.", this.settings.fakeAvatarDecorations, value => this.settings.fakeAvatarDecorations = value),
+							new Settings.Switch("Fake Profile Effects", "Uses invisible 3y3 encoding to allow setting profile effects by hiding information in your bio.", this.settings.profileEffects, value => this.settings.profileEffects = value),
+							new Settings.Switch("Kill Profile Effects", "Hate profile effects? Enable this and they'll be gone. All of them. Overrides all profile effects.", this.settings.killProfileEffects, value => this.settings.killProfileEffects = value),
+							new Settings.Switch("Fake Profile Pictures", "Uses invisible 3y3 encoding to allow setting custom profile pictures by hiding an image URL IN YOUR CUSTOM STATUS. Only supports Imgur URLs for security reasons.", this.settings.customPFPs, value => this.settings.customPFPs = value),
+							new Settings.Switch("UserPFP Integration", "Imports the UserPFP database so that people who have profile pictures in the UserPFP database will appear with their UserPFP profile picture. There's little reason to disable this.", this.settings.userPfpIntegration, value => this.settings.userPfpIntegration = value)
 						),
-						new Settings.SettingGroup("Misceláneos").append(
-							new Settings.Switch("Cambiar PremiumType", "Esto ahora es opcional. Habilitar esto puede ayudar a la compatibilidad con ciertas cosas o dañarla. SimpleDiscordCrypt requiere que esto esté habilitado para que funcione la omisión de emoji. Habilítelo solo si no tiene Nitro.", this.settings.changePremiumType, value => this.settings.changePremiumType = value),
-							new Settings.Switch("Temas de cliente degradados", "Le permite utilizar temas de cliente exclusivos de Nitro.", this.settings.clientThemes, value => this.settings.clientThemes = value),
-							new Settings.Switch("Eliminar venta adicional de personalización del perfil", "Elimina la venta adicional \"Pruébalo\" en la pantalla de personalización del perfil y la reemplaza con la variante Nitro. Nota: no le permite usar la personalización de Nitro en perfiles de servidor ya que la API no lo permite.", this.settings.removeProfileUpsell, value => this.settings.removeProfileUpsell = value),
-							new Settings.Switch("Eliminar venta adicional de Screen Share Nitro", "Elimina la venta adicional de Nitro en el menú de opciones de calidad de Screen Share.", this.settings.removeScreenshareUpsell, value => this.settings.removeScreenshareUpsell = value),
-							new Settings.Switch("Iconos de aplicaciones", "Desbloquea los iconos de aplicaciones. Advertencia: habilitar esto forzará la activación de \"Cambiar tipo premium\". Error.", this.settings.unlockAppIcons, value => this.settings.unlockAppIcons = value),
-							new Settings.Switch("Experimentos", "Desbloquea experimentos. Úsalo bajo tu propia responsabilidad.", this.settings.experiments, value => this.settings.experiments = value)
+						new Settings.SettingGroup("Clips").append(
+							new Settings.Switch("Use Clips Bypass", "Enabling this will effectively set your file upload limit for video files to 100MB. Disable this if you have a file upload limit larger than 100MB.", this.settings.useClipBypass, value => this.settings.useClipBypass = value),
+							new Settings.Switch("Force Transmuxing", "Always transmux the video, even if transmuxing would normally be skipped. Transmuxing is only ever skipped if the codec does not include AVC1 or includes MP42.", this.settings.alwaysTransmuxClips, value => this.settings.alwaysTransmuxClips = value),
+							new Settings.Switch("Force Clip", "Always send video files as a clip, even if the size is below 10MB.", this.settings.forceClip, value => this.settings.forceClip = value)
+						),
+						new Settings.SettingGroup("Miscellaneous").append(
+							new Settings.Switch("Change PremiumType", "This is now optional. Enabling this may help compatibility for certain things or harm it. SimpleDiscordCrypt requires this to be enabled to have the emoji bypass work. Only enable this if you don't have Nitro.", this.settings.changePremiumType, value => this.settings.changePremiumType = value),
+							new Settings.Switch("Gradient Client Themes", "Allows you to use Nitro-exclusive Client Themes.", this.settings.clientThemes, value => this.settings.clientThemes = value),
+							new Settings.Switch("Remove Profile Customization Upsell", "Removes the \"Try It Out\" upsell in the profile customization screen and replaces it with the Nitro variant. Note: does not allow you to use Nitro customization on Server Profiles as the API disallows this.", this.settings.removeProfileUpsell, value => this.settings.removeProfileUpsell = value),
+							new Settings.Switch("Remove Screen Share Nitro Upsell", "Removes the Nitro upsell in the Screen Share quality option menu.", this.settings.removeScreenshareUpsell, value => this.settings.removeScreenshareUpsell = value),
+							new Settings.Switch("App Icons", "Unlocks app icons. Warning: enabling this will force \"Change Premium Type\" to be enabled. Buggy.", this.settings.unlockAppIcons, value => this.settings.unlockAppIcons = value),
+							new Settings.Switch("Experiments", "Unlocks experiments. Use at your own risk.", this.settings.experiments, value => this.settings.experiments = value)
 						)
 					])
 				}
 
-				saveAndUpdate() { //Guarda y actualiza configuraciones y ejecuta funciones.
-					Utilities.saveSettings(this.getName(), this.settings);
-					BdApi.Patcher.unpatchAll(this.getName());
 
-					BdApi.DOM.removeStyle(this.getName());
-					BdApi.DOM.removeStyle("BDNitroBadges");
-					BdApi.DOM.removeStyle("UsrBGIntegration");
+				saveAndUpdate() { //Saves and updates settings and runs functions
+					Utilities.saveSettings(this.getName(), this.settings);
+					Patcher.unpatchAll(this.getName());
 
 					if (this.settings.changePremiumType) {
 						try {
@@ -310,7 +318,7 @@ module.exports = (() => {
 							}
 						}
 						catch (err) {
-							Logger.err(this.getName(), "Se produjo un error al cambiar el tipo de prima." + err);
+							Logger.err(this.getName(), "An error occurred changing premium type." + err);
 						}
 					}
 
@@ -324,7 +332,7 @@ module.exports = (() => {
 
 					if (this.settings.ResolutionSwapper) {
 						try {
-							this.buttonCreate(); //Botón y menú de calidad rápida
+							this.buttonCreate(); //Fast Quality Button and Menu
 						} catch (err) {
 							console.error(err);
 						}
@@ -355,19 +363,19 @@ module.exports = (() => {
 
 							if (this.emojiMods == undefined) this.emojiMods = Webpack.getByKeys("isEmojiFilteredOrLocked");
 
-							BdApi.Patcher.instead(this.getName(), this.emojiMods, "isEmojiFilteredOrLocked", () => {
+							Patcher.instead(this.getName(), this.emojiMods, "isEmojiFilteredOrLocked", () => {
 								return false;
 							});
-							BdApi.Patcher.instead(this.getName(), this.emojiMods, "isEmojiDisabled", () => {
+							Patcher.instead(this.getName(), this.emojiMods, "isEmojiDisabled", () => {
 								return false;
 							});
-							BdApi.Patcher.instead(this.getName(), this.emojiMods, "isEmojiFiltered", () => {
+							Patcher.instead(this.getName(), this.emojiMods, "isEmojiFiltered", () => {
 								return false;
 							});
-							BdApi.Patcher.instead(this.getName(), this.emojiMods, "isEmojiPremiumLocked", () => {
+							Patcher.instead(this.getName(), this.emojiMods, "isEmojiPremiumLocked", () => {
 								return false;
 							});
-							BdApi.Patcher.instead(this.getName(), this.emojiMods, "getEmojiUnavailableReason", () => {
+							Patcher.instead(this.getName(), this.emojiMods, "getEmojiUnavailableReason", () => {
 								return;
 							});
 
@@ -378,7 +386,7 @@ module.exports = (() => {
 
 					if (this.settings.profileV2) {
 						try {
-							BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
+							Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
 								if (ret == undefined) return;
 								ret.premiumType = 2;
 							});
@@ -389,25 +397,25 @@ module.exports = (() => {
 
 					if (this.settings.screenSharing) {
 						try {
-							this.customVideoSettings(); //Desbloquee botones de transmisión, aplique resolución y fps personalizados y aplique omisiones de calidad de transmisión
+							this.customVideoSettings(); //Unlock stream buttons, apply custom resolution and fps, and apply stream quality bypasses
 						} catch (err) {
-							Logger.err(this.getName(), "Se produjo un error durante customVideoSettings()" + err);
+							Logger.err(this.getName(), "Error occurred during customVideoSettings() " + err);
 						}
 						try {
-							this.videoQualityModule(); //Velocidad de bits personalizada, fps, módulo de resolución
+							this.videoQualityModule(); //Custom bitrate, fps, resolution module
 						} catch (err) {
-							Logger.err(this.getName(), "Se produjo un error durante videoQualityModule()" + err);
+							Logger.err(this.getName(), "Error occurred during videoQualityModule() " + err);
 						}
 					}
 
 					if (this.settings.forceStickersUnlocked) {
 						if (this.stickerSendabilityModule == undefined) this.stickerSendabilityModule = Webpack.getByKeys("cO", "eb", "kl");
 						//getStickerSendability
-						BdApi.Patcher.instead(this.getName(), this.stickerSendabilityModule, "cO", () => {
+						Patcher.instead(this.getName(), this.stickerSendabilityModule, "cO", () => {
 							return 0;
 						});
 						//isSendableSticker
-						BdApi.Patcher.instead(this.getName(), this.stickerSendabilityModule, "kl", () => {
+						Patcher.instead(this.getName(), this.stickerSendabilityModule, "kl", () => {
 							return true;
 						});
 					}
@@ -425,10 +433,12 @@ module.exports = (() => {
 							this.decodeAndApplyProfileColors();
 							this.encodeProfileColors();
 						} catch (err) {
-							Logger.err(this.getName(), "Se produjo un error al ejecutar la omisión de fakeProfileThemes." + err);
+							Logger.err(this.getName(), "Error occurred running fakeProfileThemes bypass. " + err);
 						}
 
 					}
+
+					BdApi.DOM.removeStyle(this.getName());
 
 					if (this.settings.removeScreenshareUpsell) {
 						try {
@@ -441,6 +451,8 @@ module.exports = (() => {
 							Logger.err(this.getName(), err);
 						}
 					}
+
+					BdApi.DOM.removeStyle("UsrBGIntegration");
 
 					if (this.settings.fakeProfileBanners) {
 						this.bannerUrlDecoding();
@@ -489,10 +501,11 @@ module.exports = (() => {
 						}
 					}
 
+					BdApi.DOM.removeStyle("BDNitroBadges");
 					try {
 						this.LoadingBadges();
 					} catch (err) {
-						Logger.err(this.getName(), "Se produjo un error durante LoadingBadges() " + err);
+						Logger.err(this.getName(), "An error occurred during LoadingBadges() " + err);
 					}
 
 					if (this.settings.customPFPs) {
@@ -500,7 +513,7 @@ module.exports = (() => {
 							this.customProfilePictureDecoding();
 							this.customProfilePictureEncoding(this.secondsightifyEncodeOnly);
 						} catch (err) {
-							Logger.err(this.getName(), "Se produjo un error durante la decodificación/codificación de customProfilePicture." + err);
+							Logger.err(this.getName(), "An error occurred during customProfilePicture decoding/encoding. " + err);
 						}
 					}
 
@@ -508,277 +521,478 @@ module.exports = (() => {
 						try {
 							this.experiments();
 						} catch (err) {
-							Logger.err(this.getName(), "Se produjo un error en los experimentos()" + err);
+							Logger.err(this.getName(), "Error occurred in experiments() " + err);
 						}
 					}
 
-					BdApi.Patcher.instead(this.getName(), canUserUseMod, "canUserUse", (_, [feature, user], originalFunction) => {
+					//Name changed from "canUserUse"
+					Patcher.instead(this.getName(), canUserUseMod, "ks", (_, [feature, user], originalFunction) => {
 
 						if (this.settings.emojiBypass && (feature.name == "emojisEverywhere" || feature.name == "animatedEmojis")) {
 							return true;
 						}
-
 						if (this.settings.appIcons && feature.name == 'appIcons') {
 							return true;
 						}
-
 						if (this.settings.removeProfileUpsell && feature.name == 'profilePremiumFeatures') {
 							return true;
 						}
-
 						if (this.settings.clientThemes && feature.name == 'clientThemes') {
 							return true;
 						}
-
 						return originalFunction(feature, user);
 					});
+
+					//Clips Bypass
+					if (this.settings.useClipBypass) {
+						try {
+							this.experiments();
+							this.overrideExperiment("2023-09_clips_nitro_early_access", 2);
+							this.overrideExperiment("2022-11_clips_experiment", 1);
+							this.overrideExperiment("2023-10_viewer_clipping", 1);
+
+							this.clipsBypass();
+						} catch (err) {
+							console.error(err);
+						}
+					}
+
 				} //End of saveAndUpdate()
 
-				async experiments() {
+				overrideExperiment(type, bucket) {
+					//console.log("applying experiment override " + type + "; bucket " + bucket);
+					Dispatcher.dispatch({
+						type: "EXPERIMENT_OVERRIDE_BUCKET",
+						experimentId: type,
+						experimentBucket: bucket
+					});
+				}
+
+				async clipsBypass() {
+					if (ffmpeg == undefined) await this.loadFFmpeg();
+
+					async function ffmpegTransmux(arrayBuffer, fileName = "input.mp4") {
+						if (ffmpeg) {
+							Toasts.info("Transmuxing video...");
+							ffmpeg.on("log", ({ message }) => {
+								console.log(message);
+							});
+							await ffmpeg.writeFile(fileName, new Uint8Array(arrayBuffer));
+							await ffmpeg.exec(["-i", fileName, "-codec", "copy", "-brand", "isom/avc1", "-movflags", "+faststart", "-map", "0", "-map_metadata", "-1", "-map_chapters", "-1", "output.mp4"]);
+							const data = await ffmpeg.readFile('output.mp4');
+
+							return data.buffer;
+						}
+					}
+
+					Patcher.instead(this.getName(), Webpack.getByKeys("addFiles"), "addFiles", async (_, [args], originalFunction) => {
+						//for each file being added
+						for (let i = 0; i < args.files.length; i++) {
+							const currentFile = args.files[i];
+
+							if (currentFile.file.name.endsWith(".dlfc")) return;
+
+							//larger than 10mb
+							if (currentFile.file.size > 10485759 || this.settings.forceClip) {
+								//if this file is an mp4 file
+								if (currentFile.file.type == "video/mp4") {
+									let dontStopMeNow = true;
+									let mp4BoxFile = MP4Box.createFile();
+									mp4BoxFile.onError = (e) => {
+										console.error(e);
+										dontStopMeNow = false;
+									};
+									mp4BoxFile.onReady = async (info) => {
+										mp4BoxFile.flush();
+
+										try {
+											//check if file is H264 or H265
+											if (info.videoTracks[0].codec.startsWith("avc") || info.videoTracks[0].codec.startsWith("hev1")) {
+
+												let hasTransmuxed = false;
+												if (!info.brands.includes("avc1") || info.brands.includes("mp42") || this.settings.alwaysTransmuxClips) {
+													arrayBuffer = await ffmpegTransmux(arrayBuffer, currentFile.file.name);
+													hasTransmuxed = true;
+												}
+
+												let isMetadataPresent = false;
+
+												//skip if we transmuxed since we know it won't have the tag
+												if (!hasTransmuxed) {
+													//Is this file already a Discord clip?
+													for (let j = 0; j < mp4BoxFile.boxes.length; j++) {
+														if (mp4BoxFile.boxes[j].type == "uuid") {
+															isMetadataPresent = true;
+														}
+													}
+												}
+
+												//If this file is not a Discord clip, append udtaBuffer
+												if (!isMetadataPresent) {
+
+													let array1 = ArrayBuffer.concat(arrayBuffer, udtaBuffer);
+
+													let video = new File([new Uint8Array(array1)], currentFile.file.name, { type: "video/mp4" });
+
+													currentFile.file = video;
+												}
+
+											} else {
+												//file is not H264 or H265, but is an mp4
+												arrayBuffer = await ffmpegTransmux(arrayBuffer, currentFile.file.name);
+												let array1 = ArrayBuffer.concat(arrayBuffer, udtaBuffer);
+												let video = new File([new Uint8Array(array1)], currentFile.file.name, { type: "video/mp4" });
+
+												currentFile.file = video;
+											}
+
+											//send as a "clip"
+											currentFile.clip = {
+												"id": "",
+												"version": 3,
+												"applicationName": "",
+												"applicationId": "1301689862256066560",
+												"users": [
+													CurrentUser.id
+												],
+												"clipMethod": "manual",
+												"length": currentFile.file.size,
+												"thumbnail": "",
+												"filepath": ""
+											}
+										} catch (err) {
+											Toasts.error("Something went wrong. See console for details.", { type: "error" });
+											Logger.err(this.getName(), err);
+										} finally {
+											dontStopMeNow = false;
+										}
+									};
+
+									let arrayBuffer;
+									currentFile.file.arrayBuffer().then(obj => {
+										arrayBuffer = obj;
+										arrayBuffer.fileStart = 0;
+										//examine file with mp4Box.
+										mp4BoxFile.appendBuffer(arrayBuffer);
+										//onReady will run after the buffer is appended successfully
+									});
+
+									//wait for onReady to finish
+									while (dontStopMeNow) {
+										await new Promise(r => setTimeout(r, 10));
+									}
+								} else if (currentFile.file.type.startsWith("video/")) {
+									//Is a video file, but not MP4
+
+									//AVI file warning
+									if (currentFile.file.type == "video/x-msvideo") {
+										Toasts.warning("[BDNitro] NOTE: AVI Files will send, but HTML5 does not support playing AVI video codecs!");
+									}
+									try {
+										let arrayBuffer = await currentFile.file.arrayBuffer();
+
+										let array1 = ArrayBuffer.concat(await ffmpegTransmux(arrayBuffer, currentFile.file.name), udtaBuffer);
+										let video = new File([new Uint8Array(array1)], currentFile.file.name.substr(0, currentFile.file.name.lastIndexOf(".")) + ".mp4", { type: "video/mp4" });
+
+										currentFile.file = video;
+
+										//send as a "clip"
+										currentFile.clip = {
+											"id": "",
+											"version": 3,
+											"applicationName": "",
+											"applicationId": "1301689862256066560",
+											"users": [
+												CurrentUser.id
+											],
+											"clipMethod": "manual",
+											"length": currentFile.file.size,
+											"thumbnail": "",
+											"filepath": ""
+										}
+									} catch (err) {
+										console.error(err);
+									}
+								}
+								currentFile.platform = 1;
+							}
+
+						}
+
+						originalFunction(args);
+
+					});
+				} //End of clipsBypass()
+
+				async loadFFmpeg() {
+					const defineTemp = window.global.define;
+
 					try {
-						let c; webpackChunkdiscord_app.push([[Symbol()], {}, r => c = r.c]); webpackChunkdiscord_app.pop();
-						let u = Object.values(c).find(x => x?.exports?.default?.getUsers).exports.default;
+						//load ffmpeg worker
+						const ffmpegWorkerURL = URL.createObjectURL(await (await fetch("https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/814.ffmpeg.js", { timeout: 100000 })).blob());
+
+						//load FFmpeg.WASM
+						let ffmpegSrc = await (await fetch("https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js")).text();
+
+						//patch worker URL in the source of ffmpeg.js (why is this a problem lmao)
+						ffmpegSrc = ffmpegSrc.replace(`new URL(e.p+e.u(814),e.b)`, `"${ffmpegWorkerURL.toString()}"`);
+						//blob ffmpeg
+						const ffmpegURL = URL.createObjectURL(new Blob([ffmpegSrc]));
+
+						window.global.define = undefined;
+
+						//deprecated function, but uhhhh fuck you we need it
+						await BdApi.linkJS("ffmpeg.js", ffmpegURL);
+
+						window.global.define = defineTemp;
+
+						ffmpeg = new FFmpegWASM.FFmpeg();
+
+						const ffmpegCoreURL = URL.createObjectURL(await (await fetch("https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js", { timeout: 100000 })).blob());
+
+						const ffmpegCoreWasmURL = URL.createObjectURL(await (await fetch("https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm", { timeout: 100000 })).blob());
+
+						await ffmpeg.load({
+							coreURL: ffmpegCoreURL,
+							wasmURL: ffmpegCoreWasmURL
+						});
+						console.log("FFmpeg load success!");
+					} catch (err) {
+						Toasts.error("An error occured trying to load FFmpeg.wasm. Check console for details.");
+						Logger.err(this.getName(), err);
+					} finally {
+						window.global.define = defineTemp;
+					}
+				} //End of loadFFmpeg()
+
+				experiments() {
+					try {
+						//code modified from https://gist.github.com/JohannesMP/afdf27383608c3b6f20a6a072d0be93c?permalink_comment_id=4784940#gistcomment-4784940
+						let wpRequire;
+						webpackChunkdiscord_app.push([[Math.random()], {}, (req) => { wpRequire = req; }]);
+						let u = Object.values(wpRequire.c).find((x) => x?.exports?.default?.getCurrentUser && x?.exports?.default?._dispatcher?._actionHandlers).exports.default
 						let m = Object.values(u._dispatcher._actionHandlers._dependencyGraph.nodes);
+
 						u.getCurrentUser().flags |= 1;
 						m.find((x) => x.name === "DeveloperExperimentStore").actionHandler["CONNECTION_OPEN"]();
-						try { m.find((x) => x.name === "ExperimentStore").actionHandler["OVERLAY_INITIALIZE"]({ user: { flags: 1 } }) } catch { };
-						m.find((x) => x.name === "ExperimentStore").storeDidChange();
+						try { m.find((x) => x.name === "ExperimentStore").actionHandler["OVERLAY_INITIALIZE"]({ user: { flags: 1 } }) } catch { }
+						m.find((x) => x.name === "ExperimentStore").storeDidChange()
 					} catch (err) {
-						console.log(err);
-						BdApi.showNotice("[BDNitro] An error occurred with the DiscordExperiments plugin"), { type: "error", buttons: [{ label: "Issue", onClick: () => window.open("https://github.com/srgobi/DBNitro/issues", "mozillaTab") }] };
-						return BdApi.showNotice("[BDNitro] Error: %error%", { type: "error", buttons: [{ label: "Report", onClick: () => window.open("https://github.com/srgobi/DBNitro/issues", "mozillaTab") }] });
+						//console.error(err);
 					}
 				}
 
+
 				clientThemes() {
-					console.log("[GradientTheme] Inicializando clientThemes");
 					if (this.clientThemesModule == undefined) this.clientThemesModule = Webpack.getModule(Webpack.Filters.byProps("isPreview"));
 
+					//delete isPreview property so that we can set our own
 					delete this.clientThemesModule.isPreview;
 
-					Object.defineProperty(this.clientThemesModule, "isPreview", {
+					//this property basically unlocks the client theme buttons
+					Object.defineProperty(this.clientThemesModule, "isPreview", { //Enabling the nitro theme settings
 						value: false,
 						configurable: true,
 						enumerable: true,
 						writable: true,
 					});
 
-					if (this.themesModule == undefined) this.themesModule = Webpack.getByKeys("V1", "ZI");
+					if (this.themesModule == undefined) this.themesModule = Webpack.getByKeys("V1", "ZI")
 
-					if (this.gradientSettingModule == undefined) this.gradientSettingModule = Webpack.getByKeys("kj", "zO");
+					if (this.gradientSettingModule == undefined) this.gradientSettingModule = Webpack.getByKeys("kj", "zO")
 					const resetPreviewClientTheme = this.gradientSettingModule.kj;
 					const updateBackgroundGradientPreset = this.gradientSettingModule.zO;
 
-					// Función para aplicar el tema y el degradado almacenados
-					const applyStoredTheme = () => {
-						console.log("[GradientTheme] Aplicar tema almacenado");
-						if (this.settings.lastGradientSettingStore !== -1) {
-							console.log(`[GradientTheme] Applying gradient preset: ${this.settings.lastGradientSettingStore}`);
-							updateBackgroundGradientPreset(this.settings.lastGradientSettingStore);
+					//Patching saveClientTheme function.
+					Patcher.instead(this.getName(), this.themesModule, "ZI", (_, [args]) => {
+						if (args.backgroundGradientPresetId == undefined) {
+
+							//If this number is -1, that indicates to the plugin that the current theme we're setting to is not a gradient nitro theme.
+							this.settings.lastGradientSettingStore = -1;
+							//save any changes to settings
+							Utilities.saveSettings(this.getName(), this.settings);
+
+							//if user is trying to set the theme to the default dark theme
+							if (args.theme == 'dark') {
+								//dispatch settings update to change to dark theme
+								Dispatcher.dispatch({
+									type: "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE",
+									changes: {
+										appearance: {
+											shouldSync: false, //prevent sync to stop discord api from butting in. Since this is not a nitro theme, shouldn't this be set to true? Idk, but I'm not touching it lol.
+											settings: {
+												theme: 'dark', //default dark theme
+												developerMode: true //genuinely have no idea what this does.
+											}
+										}
+									}
+								})
+								//get rid of gradient theming.
+								resetPreviewClientTheme();
+								return;
+							}
+
+							//if user is trying to set the theme to the default light theme
+							if (args.theme == 'light') {
+								//dispatch settings update event to change to light theme
+								Dispatcher.dispatch({
+									type: "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE",
+									changes: {
+										appearance: {
+											shouldSync: false,  //prevent sync to stop discord api from butting in
+											settings: {
+												theme: 'light', //default light theme
+												developerMode: true
+											}
+										}
+									}
+								})
+							}
+							return;
+						} else { //gradient themes
+							//Store the last gradient setting used in settings
+							this.settings.lastGradientSettingStore = args.backgroundGradientPresetId;
+							//save any changes to settings
+							Utilities.saveSettings(this.getName(), this.settings);
+
+							//dispatch settings update event to change to the gradient the user chose
 							Dispatcher.dispatch({
 								type: "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE",
 								changes: {
 									appearance: {
-										shouldSync: false,
+										shouldSync: false,  //prevent sync to stop discord api from butting in
 										settings: {
-											theme: this.settings.lastTheme || 'dark',
+											theme: args.theme, //gradient themes are based off of either dark or light, args.theme stores this information
 											clientThemeSettings: {
-												backgroundGradientPresetId: this.settings.lastGradientSettingStore
+												backgroundGradientPresetId: args.backgroundGradientPresetId //preset ID for the gradient theme
 											},
 											developerMode: true
 										}
 									}
 								}
 							});
-						} else {
-							console.log("[GradientTheme] No hay ningún tema degradado almacenado");
-						}
-					};
 
-					// Parcheando la función saveClientTheme.
-					BdApi.Patcher.instead(this.getName(), this.themesModule, "ZI", (_, [args]) => {
-						console.log("[GradientTheme] Guardando el tema del cliente", args);
-						if (args.backgroundGradientPresetId == undefined) {
-							this.settings.lastGradientSettingStore = -1;
-							this.settings.lastTheme = args.theme;
-						} else {
-							this.settings.lastGradientSettingStore = args.backgroundGradientPresetId;
-							this.settings.lastTheme = args.theme;
+							//update background gradient preset to the one that was just chosen.
+							updateBackgroundGradientPreset(this.settings.lastGradientSettingStore);
 						}
-						Utilities.saveSettings(this.getName(), this.settings);
+					}); //End of saveClientTheme patch.
 
-						Dispatcher.dispatch({
-							type: "SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE",
-							changes: {
-								appearance: {
-									shouldSync: false,
-									settings: {
-										theme: args.theme,
-										clientThemeSettings: args.backgroundGradientPresetId ? {
-											backgroundGradientPresetId: args.backgroundGradientPresetId
-										} : undefined,
-										developerMode: true
-									}
-								}
+
+					//If last appearance choice was a nitro client theme
+					if (this.settings.lastGradientSettingStore != -1) {
+
+						//This line sets the gradient on plugin save and load.
+						updateBackgroundGradientPreset(this.settings.lastGradientSettingStore);
+					}
+
+					if (this.accountSwitchModule == undefined) this.accountSwitchModule = Webpack.getByKeys("startSession", "login");
+
+					//startSession patch. This function runs upon switching accounts.
+					Patcher.after(this.getName(), this.accountSwitchModule, "startSession", () => {
+
+						//If last appearance choice was a nitro client theme
+						setTimeout(() => {
+							if (this.settings.lastGradientSettingStore != -1) {
+								//Restore gradient on account switch
+								updateBackgroundGradientPreset(this.settings.lastGradientSettingStore);
 							}
-						});
-
-						if (args.backgroundGradientPresetId) {
-							updateBackgroundGradientPreset(args.backgroundGradientPresetId);
-						} else if (args.theme === 'dark') {
-							resetPreviewClientTheme();
-						}
+						}, 3000)
 					});
+				} //End of clientThemes()
 
-					// Aplicar el tema almacenado al iniciar el complemento
-					applyStoredTheme();
-
-					if (this.accountSwitchModule == undefined) this.accountSwitchModule = Webpack.getByKeys("startSession");
-
-					// Parche startSession para aplicar el tema después del cambio de cuenta
-					BdApi.Patcher.after(this.getName(), this.accountSwitchModule, "startSession", () => {
-						console.log("[GradientTheme] Se detectó un cambio de cuenta");
-						// Aplicar el tema inmediatamente y luego periódicamente durante los próximos 10 segundos
-						applyStoredTheme();
-						let attempts = 0;
-						const interval = setInterval(() => {
-							if (attempts < 10) {
-								console.log(`[GradientTheme] Volviendo a aplicar el tema, intente ${attempts + 1}`);
-								applyStoredTheme();
-								attempts++;
-							} else {
-								clearInterval(interval);
-							}
-						}, 1000);
-					});
-
-					// Observa los cambios en el cuerpo del documento para detectar cambios en el tema.
-					const observer = new MutationObserver((mutations) => {
-						mutations.forEach((mutation) => {
-							if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-								const bodyClasses = document.body.className;
-								if (bodyClasses.includes('theme-dark') || bodyClasses.includes('theme-light')) {
-									console.log("[GradientTheme] Cambio de tema detectado");
-									// El tema ha cambiado, reaplica nuestro tema almacenado
-									setTimeout(applyStoredTheme, 100);
-								}
-							}
-						});
-					});
-
-					observer.observe(document.body, { attributes: true });
-
-					// Verificación periódica para garantizar que se aplica el tema
-					const periodicCheck = setInterval(() => {
-						console.log("[GradientTheme] Realización de comprobaciones periódicas");
-						if (this.settings.lastGradientSettingStore !== -1) {
-							const currentGradient = document.body.style.backgroundImage;
-							if (!currentGradient || !currentGradient.includes('linear-gradient')) {
-								console.log("[GradientTheme] Degradado no detectado, reaplicándose");
-								applyStoredTheme();
-							}
-						}
-					}, 5000);
-
-					// Limpiar cuando se detiene el complemento
-					return () => {
-						console.log("[GradientTheme] Limpiando");
-						observer.disconnect();
-						clearInterval(periodicCheck);
-					};
-				}
 
 				customProfilePictureDecoding() {
 					if (this.getAvatarUrlModule == undefined) this.getAvatarUrlModule = Webpack.getByPrototypeKeys("getAvatarURL").prototype;
 
-					BdApi.Patcher.instead(this.getName(), this.getAvatarUrlModule, "getAvatarURL", (user, [userId, size, shouldAnimate], originalFunction) => {
+					Patcher.instead(this.getName(), this.getAvatarUrlModule, "getAvatarURL", (user, [userId, size, shouldAnimate], originalFunction) => {
 
-						//integración más cercana de userpfp
-						//si aún no hemos obtenido la base de datos userPFP y está habilitada
+						//userpfp closer integration
+						//if we haven't fetched userPFP database yet and it's enabled
 						if ((!fetchedUserPfp || this.userPfps == undefined) && this.settings.userPfpIntegration) {
 
 							const userPfpJsonUrl = "https://raw.githubusercontent.com/UserPFP/UserPFP/main/source/data.json";
 
-							// descargar datos de usuarioPfp
-							BdApi.Net.fetch(userPfpJsonUrl)
+							// download userPfp data
+							Net.fetch(userPfpJsonUrl)
 								// parse as json
 								.then(res => res.json())
 								// store res.avatars in this.userPfps
 								.then(res => this.userPfps = res.avatars);
-							//establezca el indicador fetchedUserPfp en verdadero.
+							//set fetchedUserPfp flag to true.
 							fetchedUserPfp = true;
 
 						}
 
-						//si la base de datos userPfp no está definida, se ha recuperado y está habilitada
+						//if userPfp database is not undefined, has been fetched, and is enabled
 						if ((this.userPfps != undefined && fetchedUserPfp) && this.settings.userPfpIntegration) {
-							//y este usuario está en la base de datos userPfp,
+							//and this user is in the userPfp database,
 							if (this.userPfps[user.id] != undefined) {
-								//devolver la URL de la imagen de perfil de UserPFP.
+								//return UserPFP profile picture URL.
 								return this.userPfps[user.id];
 							}
 						}
 
+						//get user activities
+						let activities = DiscordModules.UserStatusStore.getActivities(user.id);
 
-						if (DiscordModules.UserStatusStore.getActivities(user.id).length > 0) {
-							//obtener actividades del usuario
-							let activities = DiscordModules.UserStatusStore.getActivities(user.id);
-							//si el usuario no tiene un estado personalizado, devuelve la función original.
+						if (activities.length > 0) {
+							//if user does not have a custom status, return original function.
 							if (activities[0].name != "Custom Status") return originalFunction(userId, size, shouldAnimate);
 
-							//Si el usuario tiene un estado personalizado, asígnelo a la variable customStatus.
+							//if user does have a custom status, assign it to customStatus variable.
 							let customStatus = activities[0].state;
-							//comprobando si algo salió mal
+							//checking if anything went wrong
 							if (customStatus == undefined) return originalFunction(userId, size, shouldAnimate);
-							//decodificar cualquier texto 3y3
+							//decode any 3y3 text
 							let revealedText = this.secondsightifyRevealOnly(String(customStatus));
-							//si no hay texto codificado 3y3, devuelve la función original.
+							//if there is no 3y3 encoded text, return original function.
 							if (revealedText == undefined) return originalFunction(userId, size, shouldAnimate);
 
-							//Esta expresión regular coincide con /P{*} . (No jodas con esto)
-							let regex = /P\{[^}]*\}/;
+							//This regex matches /P{*} . (Do not fuck with this)
+							let regex = /P\{[^}]*?\}/;
 
-							//Compruebe si hay coincidencias en el estado personalizado.
+							//Check if there are any matches in the custom status.
 							let matches = revealedText.toString().match(regex);
-							//si no, devuelve la función original
+							//if not, return orig function
 							if (matches == undefined) return originalFunction(userId, size, shouldAnimate);
 							if (matches == "") return originalFunction(userId, size, shouldAnimate);
 
-							//si hay una coincidencia, tome la primera coincidencia y elimine la "P{ inicial y la final "}"
+							//if there is a match, take the first match and remove the starting "P{ and ending "}"
 							let matchedText = matches[0].replace("P{", "").replace("}", "");
 
-							//busque una extensión de archivo. Si se omite, recurra a .gif.
+							//look for a file extension. If omitted, fallback to .gif .
 							if (!String(matchedText).endsWith(".gif") && !String(matchedText).endsWith(".png") && !String(matchedText).endsWith(".jpg") && !String(matchedText).endsWith(".jpeg") && !String(matchedText).endsWith(".webp")) {
-								matchedText += ".gif"; //No se detectó ninguna extensión de archivo compatible. Recurrir a una extensión de archivo predeterminada.
+								matchedText += ".gif"; //No supported file extension detected. Falling back to a default file extension.
 							}
 
-							//agregue este usuario a la lista de usuarios que tienen la insignia de usuario de BDNitro si aún no los hemos agregado.
+							//add this user to the list of users who have the BDNitro user badge if we haven't added them already.
 							if (!badgeUserIDs.includes(user.id)) badgeUserIDs.push(user.id);
 
 							//return imgur url
 							return `https://i.imgur.com/${matchedText}`;
 						}
 
-						//Si el usuario no tiene ninguna actividad activa, devuelve la función original.
+						//if user does not have any activities active, return original function.
 						return originalFunction(userId, size, shouldAnimate);
 					})
 				}
 
-				//Botones de personalización de perfil PFP personalizados y código de codificación.
+
+				//Custom PFP profile customization buttons and encoding code.
 				async customProfilePictureEncoding(secondsightifyEncodeOnly) {
 
-					//espere a que se cargue el renderizador de la sección de personalización de avatar
-					await Webpack.waitForModule(Webpack.Filters.byStrings("USER_SETTINGS_RESET_AVATAR"));
-					//módulo de renderizado de la sección de personalización de avatar de la tienda
-					if (this.customPFPSettingsRenderMod == undefined) this.customPFPSettingsRenderMod = Webpack.getAllByKeys("Z").filter((obj) => obj.Z.toString().includes("USER_SETTINGS_RESET_AVATAR"))[0];
+					//wait for avatar customization section renderer to be loaded
+					await Webpack.waitForModule(Webpack.Filters.byStrings("showRemoveAvatarButton", "isTryItOutFlow"));
+					//store avatar customization section renderer module
+					if (this.customPFPSettingsRenderMod == undefined) this.customPFPSettingsRenderMod = Webpack.getAllByKeys("Z").filter(obj => obj.Z.toString().includes("showRemoveAvatarButton")).filter(obj => obj.Z.toString().includes("isTryItOutFlow"))[0];
 
-					BdApi.Patcher.after(this.getName(), this.customPFPSettingsRenderMod, "Z", (_, [args], ret) => {
+					Patcher.after(this.getName(), this.customPFPSettingsRenderMod, "Z", (_, [args], ret) => {
 
-						//No es necesario hacer nada si este es el flujo "Probar Nitro".
+						//don't need to do anything if this is the "Try out Nitro" flow.
 						if (args.isTryItOutFlow) return;
 
 						ret.props.children.props.children.push(
-							BdApi.React.createElement("input", {
+							React.createElement("input", {
 								id: "profilePictureUrlInput",
 								style: {
 									width: "30%",
@@ -791,9 +1005,9 @@ module.exports = (() => {
 							})
 						);
 
-						//Crear y agregar el botón Copiar PFP 3y3.
+						//Create and append Copy PFP 3y3 button.
 						ret.props.children.props.children.push(
-							BdApi.React.createElement("button", {
+							React.createElement("button", {
 								children: "Copy PFP 3y3",
 								className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
 								id: "profilePictureButton",
@@ -801,36 +1015,36 @@ module.exports = (() => {
 									marginLeft: "10px",
 									whiteSpace: "nowrap"
 								},
-								onClick: async function () { //en copiar pfp 3y3 haga clic en el botón
+								onClick: async function () { //on copy pfp 3y3 button click
 
-									//tomar texto del área de texto de entrada de URL de pfp.
+									//grab text from pfp url input textarea.
 									let profilePictureUrlInputValue = String(document.getElementById("profilePictureUrlInput").value);
 
-									//vacío, saltar.
+									//empty, skip.
 									if (profilePictureUrlInputValue == "") return;
 									if (profilePictureUrlInputValue == undefined) return;
 
-									//limpiar cadena para codificar
+									//clean up string to encode
 									let stringToEncode = "" + profilePictureUrlInputValue
-										//limpiar URL
-										.replace("http://", "") //remover protocolo
+										//clean up URL
+										.replace("http://", "") //remove protocol
 										.replace("https://", "")
 										.replace("i.imgur.com", "imgur.com")
 
-									let encodedStr = ""; //inicializar cadena codificada como cadena vacía
-									stringToEncode = String(stringToEncode); //asegúrese doblemente de que stringToEncode sea una cadena
+									let encodedStr = ""; //initialize encoded string as empty string
+									stringToEncode = String(stringToEncode); //make doubly sure stringToEncode is a string
 
-									//si la URL parece correcta
+									//if url seems correct
 									if (stringToEncode.toLowerCase().startsWith("imgur.com")) {
 
-										//Buscar URL del álbum o galería
+										//Check for album or gallery URL
 										if (stringToEncode.replace("imgur.com/", "").startsWith("a/") || stringToEncode.replace("imgur.com/", "").startsWith("gallery/")) {
-											//URL del álbum, lo que sigue es todo para obtener el enlace directo de la imagen, ya que la URL del álbum no es un enlace directo al archivo.
+											//Album URL, what follows is all to get the direct image link, since the album URL is not a direct link to the file.
 
-											//Obtener la página del álbum imgur
+											//Fetch imgur album page
 											try {
 												const parser = new DOMParser();
-												stringToEncode = await BdApi.Net.fetch(("https://" + stringToEncode), {
+												stringToEncode = await Net.fetch(("https://" + stringToEncode), {
 													method: "GET",
 													mode: "cors"
 												}).then(res => res.text()
@@ -843,13 +1057,13 @@ module.exports = (() => {
 													.split("?")[0]; //remove any URL parameters since we don't want or need them
 											} catch (err) {
 												ZLibrary.Logger.err("BDNitro", err);
-												ZLibrary.Toasts.error("Se produjo un error. ¿Hay varias imágenes en este álbum/galería?");
+												ZLibrary.Toasts.error("An error occurred. Are there multiple images in this album/gallery?");
 												return;
 											}
 										}
 										if (stringToEncode == "") {
-											ZLibrary.Toasts.error("Se produjo un error: no se pudo encontrar el nombre del archivo.");
-											ZLibrary.Logger.err("BDNitro", "No se pudo encontrar el nombre del archivo por algún motivo. Póngase en contacto con SrGobi.");
+											ZLibrary.Toasts.error("An error occurred: couldn't find file name.");
+											ZLibrary.Logger.err("BDNitro", "Couldn't find file name for some reason. Contact SrGobi.");
 										}
 
 										//add starting "P{" , remove "imgur.com/" , and add ending "}"
@@ -857,11 +1071,11 @@ module.exports = (() => {
 										//finally encode the string, adding a space before it so nothing fucks up
 										encodedStr = " " + secondsightifyEncodeOnly(stringToEncode);
 										//let the user know what has happened
-										Toasts.info("¡3y3 copiado al portapapeles!");
+										Toasts.info("3y3 copied to clipboard!");
 
 										//If this is not an Imgur URL, yell at the user.
 									} else if (stringToEncode.toLowerCase().startsWith("imgur.com") == false) {
-										Toasts.warning("¡Por favor usa Imgur!");
+										Toasts.warning("Please use Imgur!");
 										return;
 									}
 
@@ -882,6 +1096,7 @@ module.exports = (() => {
 						); //end of element push
 					}); //end of patch
 				} //End of customProfilePictureEncoding()
+
 
 				// Aplicar badges customizados
 				LoadingBadges() {
@@ -1034,6 +1249,7 @@ module.exports = (() => {
 					}); // Fin del parche de getUserProfile
 				} // Fin de LoadingBadges()
 
+
 				secondsightifyRevealOnly(t) {
 					if ([...t].some(x => (0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f))) {
 						// 3y3 text detected. Revealing...
@@ -1043,6 +1259,7 @@ module.exports = (() => {
 						return;
 					}
 				}
+
 
 				secondsightifyEncodeOnly(t) {
 					if ([...t].some(x => (0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f))) {
@@ -1054,27 +1271,28 @@ module.exports = (() => {
 					}
 				}
 
-				//Todo lo relacionado con Efectos de Perfil Falso.
+
+				//Everything related to Fake Profile Effects.
 				async profileFX(secondsightifyEncodeOnly) {
 
-					if (this.settings.killProfileEffects) return; //profileFX es mutuamente excluyente con killProfileEffects (obviamente)
+					if (this.settings.killProfileEffects) return; //profileFX is mutually exclusive with killProfileEffects (obviously)
 
 
-					//esperar el módulo de efectos de perfil
+					//wait for profile effects module
 					await Webpack.waitForModule(Webpack.Filters.byProps("profileEffects", "tryItOutId"));
 
-					//intenta obtener datos de efectos de perfil
+					//try to get profile effects data
 					if (this.profileEffects == undefined) this.profileEffects = Webpack.getStore("ProfileEffectStore").profileEffects;
 					if (this.fetchProfileEffects == undefined) this.fetchProfileEffects = Webpack.getAllByKeys("z").filter((obj) => obj.z.toString().includes("USER_PROFILE_EFFECTS_FETCH"))[0].z;
 
-					//si el cliente aún no ha obtenido los datos de efectos del perfil
+					//if profile effects data hasn't been fetched by the client yet
 					if (this.profileEffects == undefined) {
-						//hacer que el cliente busque efectos de perfil
-						await this.fetchProfileEffects("No se pudieron recuperar los efectos del perfil.");
-						//luego espera a que se obtengan los efectos y guárdalos
+						//make the client fetch profile effects
+						await this.fetchProfileEffects("Failed to fetch profile effects.");
+						//then wait for the effects to be fetched and store them
 						this.profileEffects = Webpack.getStore("ProfileEffectStore").profileEffects;
 					} else if (this.profileEffects.length == 0) {
-						await this.fetchProfileEffects("No se pudieron recuperar los efectos del perfil.");
+						await this.fetchProfileEffects("Failed to fetch profile effects.");
 						this.profileEffects = Webpack.getStore("ProfileEffectStore").profileEffects;
 					}
 
@@ -1084,44 +1302,44 @@ module.exports = (() => {
 					}
 
 
-					BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, [args], ret) => {
-						//prevención de errores
+					Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, [args], ret) => {
+						//error prevention
 						if (ret == undefined) return;
 						if (ret.bio == undefined) return;
 
-						//revelar texto codificado 3y3. Esta cadena también incluirá el resto de la biografía.
+						//reveal 3y3 encoded text. this string will also include the rest of the bio
 						let revealedText = this.secondsightifyRevealOnly(ret.bio);
 						if (revealedText == undefined) return;
 
-						//si se detecta el efecto de perfil 3y3
+						//if profile effect 3y3 is detected
 						if (revealedText.includes("/fx")) {
 							let position = revealedText.indexOf("/fx");
 							if (position == undefined) return;
 
-							//busca los 2 caracteres después de /fx y analiza int
+							//find the 2 characters after the /fx and parse int
 							let effectIndex = parseInt(revealedText.slice(position + 3, position + 5));
-							//ignorar datos no válidos
+							//ignore invalid data 
 							if (isNaN(effectIndex)) return;
-							//ignorar si la identificación del efecto del perfil no apunta a un efecto de perfil real
+							//ignore if the profile effect id does not point to an actual profile effect
 							if (profileEffectIdList[effectIndex] == undefined) return;
-							//establecer el efecto del perfil
+							//set the profile effect
 							ret.profileEffectId = profileEffectIdList[effectIndex];
 
-							//si por alguna razón no sabemos cuál es el ID de este usuario, deténgase aquí
+							//if for some reason we dont know what this user's ID is, stop here
 							if (args == undefined) return;
-							//de lo contrario, agréguelos a la lista de usuarios que aparecen con la insignia de usuario de BDNitro
+							//otherwise add them to the list of users who show up with the BDNitro user badge
 							if (!badgeUserIDs.includes(args)) badgeUserIDs.push(args);
 						}
 					}); //end of getUserProfile patch.
 
-					//espera a que se cargue el renderizador de la sección de efectos de perfil.
+					//wait for profile effect section renderer to be loaded.
 					await Webpack.waitForModule(Webpack.Filters.byStrings("initialSelectedEffectId"));
 
 					//fetch the module now that it's loaded
 					if (this.profileEffectSectionRenderer == undefined) this.profileEffectSectionRenderer = Webpack.getAllByKeys("Z").filter((obj) => obj.Z.toString().includes("initialSelectedEffectId"))[0];
 
 					//patch profile effect section renderer function to run the following code after the function runs
-					BdApi.Patcher.after(this.getName(), this.profileEffectSectionRenderer, "Z", (_, [args], ret) => {
+					Patcher.after(this.getName(), this.profileEffectSectionRenderer, "Z", (_, [args], ret) => {
 						//if this is the tryItOut flow, don't do anything.
 						if (args.isTryItOutFlow) return;
 
@@ -1143,13 +1361,14 @@ module.exports = (() => {
 								document.body.appendChild(clipboardTextElem);
 								clipboardTextElem.select();
 								clipboardTextElem.setSelectionRange(0, 99999);
-								document.execCommand("copy"); ZLibrary.Toasts.info("¡3y3 copiado al portapapeles!");
+								document.execCommand("copy");
+								ZLibrary.Toasts.info("3y3 copied to clipboard!");
 								document.body.removeChild(clipboardTextElem);
 							}
 
 							profileEffectChildren.push(
-								BdApi.React.createElement("img", {
-									className: "riolubruhsSecretStuff",
+								React.createElement("img", {
+									className: "srgobisSecretStuff",
 									onClick: copyDecoration3y3,
 									src: previewURL,
 									title,
@@ -1166,14 +1385,14 @@ module.exports = (() => {
 							//add newline every 4th profile effect
 							if ((i + 1) % 4 == 0) {
 								profileEffectChildren.push(
-									BdApi.React.createElement("br")
+									React.createElement("br")
 								);
 							}
 						}
 
 						//Profile Effects Modal
 						function EffectsModal() {
-							const elem = BdApi.React.createElement("div", {
+							const elem = React.createElement("div", {
 								style: {
 									width: "100%",
 									display: "block",
@@ -1190,7 +1409,7 @@ module.exports = (() => {
 						//Append Change Effect button
 						ret.props.children.props.children.push(
 							//self explanatory create react element
-							BdApi.React.createElement("button", {
+							React.createElement("button", {
 								children: "Change Effect [BDNitro]",
 								className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
 								size: "sizeSmall__71a98",
@@ -1202,7 +1421,7 @@ module.exports = (() => {
 									marginLeft: "10px"
 								},
 								onClick: () => {
-									BdApi.showConfirmationModal("Cambiar efecto de perfil (BDNitro)", BdApi.React.createElement(EffectsModal));
+									BdApi.showConfirmationModal("Change Profile Effect (BDNitro)", React.createElement(EffectsModal));
 								}
 
 							})
@@ -1211,8 +1430,9 @@ module.exports = (() => {
 
 				} //End of profileFX()
 
+
 				killProfileFX() { //self explanatory
-					BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
+					Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
 						if (ret == undefined) return;
 						if (ret.profileEffectID == undefined) return;
 						//self explanatory
@@ -1238,7 +1458,7 @@ module.exports = (() => {
 
 				async fakeAvatarDecorations() {
 					//keep track of profiles downloaded
-					BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, [args], ret) => {
+					Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, [args], ret) => {
 						if (ret == undefined) return;
 						if (ret.userId == undefined) return;
 						if (downloadedUserProfiles.includes(args)) return;
@@ -1246,7 +1466,7 @@ module.exports = (() => {
 					});
 
 					//apply decorations
-					BdApi.Patcher.after(this.getName(), DiscordModules.UserStore, "getUser", (_, args, ret) => {
+					Patcher.after(this.getName(), DiscordModules.UserStore, "getUser", (_, args, ret) => {
 						//basic error checking
 						if (args == undefined) return;
 						if (args[0] == undefined) return;
@@ -1262,7 +1482,7 @@ module.exports = (() => {
 								let userProfile = userProfileMod.getUserProfile(args[0]);
 
 								//if their bio is empty, move on to the next check.
-								if (userProfile.bio != undefined) {
+								if (userProfile?.bio != undefined) {
 									//reveal 3y3 encoded text
 									revealedTextLocal = self.secondsightifyRevealOnly(String(userProfile.bio));
 									//if there's no 3y3 text, move on to the next check.
@@ -1275,9 +1495,10 @@ module.exports = (() => {
 								}
 
 							}
-							if (DiscordModules.UserStatusStore.getActivities(args[0]).length > 0) {
+							let activities = DiscordModules.UserStatusStore.getActivities(args[0]);
+							if (activities.length > 0) {
 								//grab user's activities (this includes custom status)
-								let activities = DiscordModules.UserStatusStore.getActivities(args[0]);
+
 								//if they don't have a custom status, stop processing.
 								if (activities[0].name != "Custom Status") return;
 								//otherwise, grab the text from the custom status
@@ -1341,13 +1562,13 @@ module.exports = (() => {
 					if (!this.decorationCustomizationSectionMod) this.decorationCustomizationSectionMod = Webpack.getAllByKeys("Z").filter((obj) => obj.Z.toString().includes("userAvatarDecoration"))[0];
 
 					//Avatar decoration customization section patch
-					BdApi.Patcher.after(this.getName(), this.decorationCustomizationSectionMod, "Z", (_, [args], ret) => {
+					Patcher.after(this.getName(), this.decorationCustomizationSectionMod, "Z", (_, [args], ret) => {
 						//don't run if this is the try out nitro flow.
 						if (args.isTryItOutFlow) return;
 
 						//push change decoration button
 						ret.props.children[0].props.children.push(
-							BdApi.React.createElement("button", {
+							React.createElement("button", {
 								id: "decorationButton",
 								children: "Change Decoration [BDNitro]",
 								style: {
@@ -1359,7 +1580,7 @@ module.exports = (() => {
 								},
 								className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
 								onClick: () => {
-									BdApi.showConfirmationModal("Change Avatar Decoration (BDNitro)", BdApi.React.createElement(DecorModal));
+									BdApi.showConfirmationModal("Change Avatar Decoration (BDNitro)", React.createElement(DecorModal));
 								}
 							})
 						);
@@ -1384,7 +1605,7 @@ module.exports = (() => {
 								document.execCommand("copy");
 								ZLibrary.Toasts.info("3y3 copied to clipboard!"); document.body.removeChild(clipboardTextElem);
 							}
-							let child = BdApi.React.createElement("img", {
+							let child = React.createElement("img", {
 								style: {
 									width: "23%",
 									cursor: "pointer",
@@ -1401,12 +1622,12 @@ module.exports = (() => {
 							//add newline every 4th decoration
 							if ((i + 1) % 4 == 0) {
 								//avatarDecorationsHTML += "<br>"
-								avatarDecorationChildren.push(BdApi.React.createElement("br"));
+								avatarDecorationChildren.push(React.createElement("br"));
 							}
 						}
 
 						function DecorModal() {
-							return BdApi.React.createElement("div", {
+							return React.createElement("div", {
 								style: {
 									width: "100%",
 									display: "block",
@@ -1422,6 +1643,7 @@ module.exports = (() => {
 					}); //end patch of profile decoration section renderer function
 
 				} //End of fakeAvatarDecorations()
+
 
 				async UploadEmote(url, channelIdLmao, msg, emoji, runs) {
 					if (emoji === undefined) {
@@ -1473,6 +1695,7 @@ module.exports = (() => {
 					}
 				}
 
+
 				//Whether we should skip the emoji bypass for a given emoji.
 				// true = skip bypass
 				// false = perform bypass
@@ -1494,16 +1717,17 @@ module.exports = (() => {
 					return false;
 				}
 
+
 				customVideoSettings() { //Unlock stream buttons, apply custom resolution and fps, and apply stream quality bypasses
 					//If you're trying to figure this shit out yourself, I recommend uncommenting the line below.
 					//console.log(StreamButtons);
 
 					//Nice try, Discord.
-					BdApi.Patcher.instead(this.getName(), StreamButtons, "L9", (_, [args]) => {
+					Patcher.instead(this.getName(), StreamButtons, "L9", (_, [args]) => {
 						//getApplicationFramerate
 						return args;
 					});
-					BdApi.Patcher.instead(this.getName(), StreamButtons, "aW", (_, [args]) => {
+					Patcher.instead(this.getName(), StreamButtons, "aW", (_, [args]) => {
 						//getApplicationResolution
 						return args;
 					});
@@ -1571,7 +1795,7 @@ module.exports = (() => {
 					removing the setting requirements makes it default to thinking that every premiumType can use it.*/
 					ApplicationStreamSettingRequirements.forEach(removeQualityParameters);
 					function replace60FPSRequirements(x) {
-						if (x.fps != 30 && x.fps != 15 && x.fps != 5) x.fps = BdApi.getData(this.getName(), "settings").CustomFPS;
+						if (x.fps != 30 && x.fps != 15 && x.fps != 5) x.fps = BdApi.getData("BDNitro", "settings").CustomFPS;
 					}
 					function restore60FPSRequirements(x) {
 						if (x.fps != 30 && x.fps != 15 && x.fps != 5) x.fps = 60;
@@ -1613,7 +1837,7 @@ module.exports = (() => {
 					//Upload Emotes Method
 					if (this.settings.uploadEmotes) {
 
-						BdApi.Patcher.instead(this.getName(), DiscordModules.MessageActions, "_sendMessage", (_, msg, send) => {
+						Patcher.instead(this.getName(), DiscordModules.MessageActions, "_sendMessage", (_, msg, send) => {
 							if (msg[2].poll != undefined || msg[2].activityAction != undefined) { //fix polls, activity actions
 								send(msg[0], msg[1], msg[2], msg[3]);
 								return;
@@ -1631,12 +1855,14 @@ module.exports = (() => {
 							msg[1].validNonShortcutEmojis.forEach(emoji => {
 								if (this.emojiBypassForValidEmoji(emoji, currentChannelId)) return; //Unlocked emoji. Skip.
 								if (emoji.type == "UNICODE") return; //If this "emoji" is actually a unicode character, it doesn't count. Skip bypassing if so.
+								if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
 								if (this.settings.PNGemote) {
 									emoji.forcePNG = true; //replace WEBP with PNG if the option is enabled.
 								}
 								let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
-								if (emojiUrl.startsWith("/assets/")) return; //System emoji. Skip.
-
+								if (emoji.animated) {
+									emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf(".")) + ".gif";
+								}
 
 								//If there is a backslash (\) before the emote we are processing,
 								if (msg[1].content.includes("\\<" + emoji.allNamesString.replace(/~\b\d+\b/g, "") + emoji.id + ">")) {
@@ -1649,7 +1875,7 @@ module.exports = (() => {
 								runs++; // increment number of times the uploader has run for this message.
 
 								//remove existing URL parameters and add custom URL parameters for user's size preference. quality is always lossless.
-								emojiUrl = emojiUrl.split("?")[0] + `?size=${this.settings.emojiSize}&quality=lossless`;
+								emojiUrl = emojiUrl.split("?")[0] + `?size=${this.settings.emojiSize}&quality=lossless&`;
 								//remove emote from message.
 								msg[1].content = msg[1].content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, "");
 								//upload emote
@@ -1660,7 +1886,7 @@ module.exports = (() => {
 							}
 						});
 
-						BdApi.Patcher.instead(this.getName(), Uploader, "uploadFiles", (_, [args], originalFunction) => {
+						Patcher.instead(this.getName(), Uploader, "uploadFiles", (_, [args], originalFunction) => {
 
 							if (document.getElementsByClassName("sdc-tooltip").length > 0) {
 								let SDC_Tooltip = document.getElementsByClassName("sdc-tooltip")[0];
@@ -1684,7 +1910,10 @@ module.exports = (() => {
 										}
 
 										let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
-										if (emojiUrl.startsWith("/assets/")) return; //System emoji. Skip.
+										if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
+										if (emoji.animated) {
+											emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf(".")) + ".gif";
+										}
 
 										//If there is a backslash (\) before the emote we are processing,
 										if (args.parsedMessage.content.includes("\\<" + emoji.allNamesString.replace(/~\b\d+\b/g, "") + emoji.id + ">")) {
@@ -1708,9 +1937,12 @@ module.exports = (() => {
 									for (let i = 0; i < emojis.length; i++) {
 										let emoji = emojis[i];
 										let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
+										if (emoji.animated) {
+											emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf(".")) + ".gif";
+										}
 
 										//remove existing URL parameters and add custom URL parameters for user's size preference. quality is always lossless.
-										emojiUrl = emojiUrl.split("?")[0] + `?size=${this.settings.emojiSize}&quality=lossless`;
+										emojiUrl = emojiUrl.split("?")[0] + `?size=${this.settings.emojiSize}&quality=lossless&`;
 
 										this.UploadEmote(emojiUrl, currentChannelId, [currentChannelId, { content: "", tts: false, invalidEmojis: [] }], emoji, 1);
 									}
@@ -1746,7 +1978,10 @@ module.exports = (() => {
 								if (self.settings.PNGemote) emoji.forcePNG = true;
 
 								let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
-								if (emojiUrl.startsWith("/assets/")) return;
+								if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
+								if (emoji.animated) {
+									emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf(".")) + ".gif";
+								}
 
 								if (msg.content.includes("\\<" + emoji.allNamesString.replace(/~\b\d+\b/g, "") + emoji.id + ">")) {
 									msg.content = msg.content.replace(("\\<" + emoji.allNamesString.replace(/~\b\d+\b/g, "") + emoji.id + ">"), ("<" + emoji.allNamesString.replace(/~\b\d+\b/g, "") + emoji.id + ">"));
@@ -1755,7 +1990,7 @@ module.exports = (() => {
 
 								//if ghost mode is not required
 								if (msg.content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, "") == "") {
-									msg.content = msg.content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, emojiUrl.split("?")[0] + `?size=${self.settings.emojiSize}&quality=lossless `)
+									msg.content = msg.content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, emojiUrl.split("?")[0] + `?size=${self.settings.emojiSize}&quality=lossless& `)
 									return;
 								}
 								emojiGhostIteration++; //increment dummy value
@@ -1765,21 +2000,21 @@ module.exports = (() => {
 									//remove processed emoji from the message
 									msg.content = msg.content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, ""),
 										//add to the end of the message
-										msg.content += " " + emojiUrl.split("?")[0] + `?size=${self.settings.emojiSize}&quality=lossless&${emojiGhostIteration} `
+										msg.content += " " + emojiUrl.split("?")[0] + `?size=${self.settings.emojiSize}&quality=lossless&${emojiGhostIteration}& `
 									return;
 								}
 								//if message doesn't already have ghostmodetext, remove processed emoji and add it to the end of the message with the ghost mode text
-								msg.content = msg.content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, ""), msg.content += ghostmodetext + "\n" + emojiUrl.split("?")[0] + `?size=${self.settings.emojiSize}&quality=lossless `
+								msg.content = msg.content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, ""), msg.content += ghostmodetext + "\n" + emojiUrl.split("?")[0] + `?size=${self.settings.emojiSize}&quality=lossless& `
 							});
 						}
 
 						//sending message in ghost mode
-						BdApi.Patcher.before(this.getName(), DiscordModules.MessageActions, "sendMessage", (_, [currentChannelId, msg]) => {
+						Patcher.before(this.getName(), DiscordModules.MessageActions, "sendMessage", (_, [currentChannelId, msg]) => {
 							ghostModeMethod(msg, currentChannelId, this);
 						});
 
 						//uploading file with emoji in the message in ghost mode.
-						BdApi.Patcher.before(this.getName(), Uploader, "uploadFiles", (_, [args], originalFunction) => {
+						Patcher.before(this.getName(), Uploader, "uploadFiles", (_, [args], originalFunction) => {
 							const currentChannelId = args.channelId;
 							const msg = args.parsedMessage;
 							ghostModeMethod(msg, currentChannelId, this);
@@ -1806,41 +2041,45 @@ module.exports = (() => {
 								if (self.settings.PNGemote) emoji.forcePNG = true;
 
 								let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
-								if (emojiUrl.startsWith("/assets/")) return;
+								if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
+								if (emoji.animated) {
+									emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf(".")) + ".gif";
+								}
 
 								if (msg.content.includes("\\<" + emoji.allNamesString.replace(/~\b\d+\b/g, "") + emoji.id + ">")) {
 									msg.content = msg.content.replace(("\\<" + emoji.allNamesString.replace(/~\b\d+\b/g, "") + emoji.id + ">"), ("<" + emoji.allNamesString.replace(/~\b\d+\b/g, "") + emoji.id + ">"));
 									return //If there is a backslash before the emoji, skip it.
 								}
 								emojiGhostIteration++;
-								msg.content = msg.content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, emojiUrl.split("?")[0] + `?size=${self.settings.emojiSize}&quality=lossless&${emojiGhostIteration} `)
+								msg.content = msg.content.replace(`<${emoji.animated ? "a" : ""}${emoji.allNamesString.replace(/~\b\d+\b/g, "")}${emoji.id}>`, emojiUrl.split("?")[0] + `?size=${self.settings.emojiSize}&quality=lossless&${emojiGhostIteration}& `)
 							});
 						}
 
 						//sending message in classic mode
-						BdApi.Patcher.before(this.getName(), DiscordModules.MessageActions, "sendMessage", (_, [currentChannelId, msg]) => {
+						Patcher.before(this.getName(), DiscordModules.MessageActions, "sendMessage", (_, [currentChannelId, msg]) => {
 							classicModeMethod(msg, currentChannelId, this);
 						});
 
 						//uploading file with emoji in the message in classic mode.
-						BdApi.Patcher.before(this.getName(), Uploader, "uploadFiles", (_, [args], originalFunction) => {
+						Patcher.before(this.getName(), Uploader, "uploadFiles", (_, [args], originalFunction) => {
 							const msg = args.parsedMessage;
 							const currentChannelId = args.channelId;
 							classicModeMethod(msg, currentChannelId, this);
 						});
 
 						//editing message in classic mode
-						BdApi.Patcher.before(this.getName(), DiscordModules.MessageActions, "editMessage", (_, obj) => {
+						Patcher.before(this.getName(), DiscordModules.MessageActions, "editMessage", (_, obj) => {
 							let msg = obj[2].content
 							if (msg.search(/\d{18}/g) == -1) return;
 							if (msg.includes(":ENC:")) return; //Fix jank with editing SimpleDiscordCrypt encrypted messages.
 							msg.match(/<a:.+?:\d{18}>|<:.+?:\d{18}>/g).forEach(idfkAnymore => {
-								obj[2].content = obj[2].content.replace(idfkAnymore, `https://cdn.discordapp.com/emojis/${idfkAnymore.match(/\d{18}/g)[0]}?size=${this.settings.emojiSize}`)
+								obj[2].content = obj[2].content.replace(idfkAnymore, `https://cdn.discordapp.com/emojis/${idfkAnymore.match(/\d{18}/g)[0]}?size=${this.settings.emojiSize}&quality=lossless&`)
 							})
 						});
 						return;
 					}
 				} //End of emojiBypass()
+
 
 				updateQuick() { //Function that runs when the resolution/fps quick menu is changed.
 					//Refer to customVideoSettings function for comments on what this all does, since this code is just a copy-paste from there.
@@ -1910,12 +2149,13 @@ module.exports = (() => {
 					}
 				} //End of updateQuick()
 
+
 				videoQualityModule() { //Custom Bitrates, FPS, Resolution
 					if (this.videoOptionFunctions == undefined) this.videoOptionFunctions = Webpack.getByPrototypeKeys("updateVideoQuality").prototype;
-					BdApi.Patcher.before(this.getName(), this.videoOptionFunctions, "updateVideoQuality", (e) => {
+
+					Patcher.before(this.getName(), this.videoOptionFunctions, "updateVideoQuality", (e) => {
 
 						if (!e.videoQualityManager.qualityOverwrite) e.videoQualityManager.qualityOverwrite = {};
-
 
 						if (this.settings.minBitrate > 0 && this.settings.CustomBitrateEnabled) {
 							//Minimum Bitrate
@@ -2027,104 +2267,11 @@ module.exports = (() => {
 							e.videoQualityManager.ladder.orderedLadder = LadderModule.calculateOrderedLadder(e.videoQualityManager.ladder.ladder);
 						}
 
-
 						// Video codecs
-						if (this.settings.videoCodec > 0) {
-							//This code determines what codec was chosen
-							let isCodecH265 = false;
-							let isCodecH264 = false;
-							let isCodecAV1 = false;
-							let isCodecVP8 = false;
-							let isCodecVP9 = false;
-							switch (this.settings.videoCodec) {
-								case 1:
-									isCodecH265 = true;
-									break;
-								case 2:
-									isCodecH264 = true;
-									break;
-								case 3:
-									isCodecAV1 = true;
-									break;
-								case 4:
-									isCodecVP8 = true;
-									break;
-								case 5:
-									isCodecVP9 = true;
-									break;
-							}
-
-
-							//This code determines what priorities to set each codec to based on which one was chosen by the user.
-							let currentHighestNum = 1;
-							function setPriority(codec) {
-								switch (codec) {
-									case 0:
-										if (isCodecH265) {
-											return 1;
-										} else {
-											currentHighestNum += 1;
-											return currentHighestNum;
-										}
-										break;
-									case 1:
-										if (isCodecH264) {
-											return 1;
-										} else {
-											currentHighestNum += 1;
-											return currentHighestNum;
-										}
-										break;
-
-									case 2:
-										if (isCodecAV1) {
-											return 1;
-										} else {
-											currentHighestNum += 1;
-											return currentHighestNum;
-										}
-										break;
-									case 3:
-										if (isCodecVP8) {
-											return 1;
-										} else {
-											currentHighestNum += 1;
-											return currentHighestNum;
-										}
-										break;
-									case 4:
-										if (isCodecVP9) {
-											return 1;
-										} else {
-											currentHighestNum += 1;
-											return currentHighestNum;
-										}
-										break;
-								}
-							}
-
-							//and this code sets the priorities based on the outputs of setPriority.
-							if (e.codecs != undefined && e.codecs[1]?.decode != undefined) {
-
-								e.codecs[1].decode = isCodecH265; //H.265
-								e.codecs[1].encode = isCodecH265;
-								e.codecs[1].priority = parseInt(setPriority(0));
-
-								e.codecs[2].decode = isCodecH264; //H.264
-								e.codecs[2].encode = isCodecH264;
-								e.codecs[2].priority = parseInt(setPriority(1));
-
-								e.codecs[3].decode = isCodecVP8; //VP8
-								e.codecs[3].encode = isCodecVP8;
-								e.codecs[3].priority = parseInt(setPriority(2));
-
-								e.codecs[4].decode = isCodecVP9; //VP9
-								e.codecs[4].encode = isCodecVP9;
-								e.codecs[4].priority = parseInt(setPriority(3));
-							}
-						}
+						//todo: rewrite video codecs to actually work
 					});
 				} //End of videoQualityModule()
+
 
 				buttonCreate() { //Creates the FPS and Resolution Swapper
 					let qualityButton = document.createElement('button');
@@ -2156,7 +2303,7 @@ module.exports = (() => {
 					try {
 						document.getElementsByClassName(DiscordClassModules.AccountDetails.container)[0].appendChild(qualityButton);
 					} catch (err) {
-						console.error("[BDNitro] ¿Qué carajo pasó...? Durante el botónCrear()" + err);
+						console.error("[BDNitro] What the fuck happened..? During buttonCreate() " + err);
 					}
 
 					let qualityMenu = document.createElement('div');
@@ -2193,20 +2340,21 @@ module.exports = (() => {
 					qualityMenu.appendChild(qualityInputFPS);
 				} //End of buttonCreate()
 
+
 				async stickerSending() {
 					if (this.stickerSendabilityModule == undefined) this.stickerSendabilityModule = Webpack.getByKeys("cO", "eb", "kl");
 
 					//getStickerSendability
-					BdApi.Patcher.instead(this.getName(), this.stickerSendabilityModule, "cO", () => {
+					Patcher.instead(this.getName(), this.stickerSendabilityModule, "cO", () => {
 						return 0;
 					});
 
 					//isSendableSticker
-					BdApi.Patcher.instead(this.getName(), this.stickerSendabilityModule, "kl", () => {
+					Patcher.instead(this.getName(), this.stickerSendabilityModule, "kl", () => {
 						return true;
 					});
 
-					BdApi.Patcher.instead(this.getName(), DiscordModules.MessageActions, "sendStickers", (_, args, originalFunction) => {
+					Patcher.instead(this.getName(), DiscordModules.MessageActions, "sendStickers", (_, args, originalFunction) => {
 						let stickerID = args[1][0];
 						let stickerURL = "https://media.discordapp.net/stickers/" + stickerID + ".png?size=4096&quality=lossless"
 						let currentChannelId = DiscordModules.SelectedChannelStore.getChannelId();
@@ -2226,8 +2374,9 @@ module.exports = (() => {
 					});
 				}
 
+
 				decodeAndApplyProfileColors() {
-					BdApi.Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
+					Patcher.after(this.getName(), userProfileMod, "getUserProfile", (_, args, ret) => {
 						if (ret == undefined) return;
 						if (ret.bio == null) return;
 						const colorString = ret.bio.match(
@@ -2244,8 +2393,9 @@ module.exports = (() => {
 					});
 				}
 
-				//Todo lo que tiene que ver con la GUI y la codificación de los colores del perfil falso 3y3 mierda.
-				//Se reemplazó la manipulación del DOM con el parche de React 2/4/2024
+
+				//Everything that has to do with the GUI and encoding of the fake profile colors 3y3 shit.
+				//Replaced DOM manipulation with React patching 4/2/2024
 				async encodeProfileColors(primary, accent) {
 
 					//wait for theme color picker module to be loaded
@@ -2256,10 +2406,10 @@ module.exports = (() => {
 
 					if (this.colorPickerRendererMod == undefined) this.colorPickerRendererMod = Webpack.getAllByKeys("Z").filter(obj => obj.Z.toString().includes("__invalid_profileThemesSection"))[0];
 
-					BdApi.Patcher.after(this.getName(), this.colorPickerRendererMod, "Z", (_, args, ret) => {
+					Patcher.after(this.getName(), this.colorPickerRendererMod, "Z", (_, args, ret) => {
 
 						ret.props.children.props.children.push( //append copy colors 3y3 button
-							BdApi.React.createElement("button", {
+							React.createElement("button", {
 								id: "copy3y3button",
 								children: "Copy Colors 3y3",
 								className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
@@ -2282,7 +2432,7 @@ module.exports = (() => {
 										}
 									}
 									if (themeColors == undefined) {
-										Toasts.warning("No se ha copiado nada. ¿El color seleccionado es idéntico a su color actual?");
+										Toasts.warning("Nothing has been copied. Is the selected color identical to your current color?");
 										return;
 									}
 									const primary = themeColors[0];
@@ -2305,7 +2455,7 @@ module.exports = (() => {
 									clipboardTextElem.select();
 									clipboardTextElem.setSelectionRange(0, 99999);
 									document.execCommand('copy');
-									Toasts.info("¡3y3 copiado al portapapeles!");
+									Toasts.info("3y3 copied to clipboard!");
 									document.body.removeChild(clipboardTextElem);
 								}
 							})
@@ -2314,8 +2464,8 @@ module.exports = (() => {
 
 				} //End of encodeProfileColors()
 
-				//Commented to hell and back on 3/6/2024
-				bannerUrlDecoding() { //Decode 3y3 from profile bio and apply fake banners.
+				//Decode 3y3 from profile bio and apply fake banners.
+				bannerUrlDecoding() {
 
 					let endpoint, bucket, prefix, data;
 
@@ -2326,7 +2476,7 @@ module.exports = (() => {
 						const userBgJsonUrl = "https://usrbg.is-hardly.online/users";
 
 						//download, then store json
-						BdApi.Net.fetch(userBgJsonUrl).then(res => res.json().then(res => {
+						Net.fetch(userBgJsonUrl, { timeout: 100000 }).then(res => res.json().then(res => {
 							data = res;
 							endpoint = res.endpoint;
 							bucket = res.bucket;
@@ -2338,12 +2488,12 @@ module.exports = (() => {
 					}
 
 					//Patch getUserBannerURL function
-					BdApi.Patcher.before(this.getName(), AvatarDefaults, "getUserBannerURL", (_, args) => {
+					Patcher.before(this.getName(), AvatarDefaults, "getUserBannerURL", (_, args) => {
 						args[0].canAnimate = true;
 					});
 
 					//Patch getBannerURL function
-					BdApi.Patcher.instead(this.getName(), getBannerURL, "getBannerURL", (user, [args], ogFunction) => {
+					Patcher.instead(this.getName(), getBannerURL, "getBannerURL", (user, [args], ogFunction) => {
 						let profile = user._userProfile;
 
 						//Returning ogFunction with the same arguments that were passed to this function will do the vanilla check for a legit banner.
@@ -2372,7 +2522,7 @@ module.exports = (() => {
 						if (parsed == undefined) return ogFunction(args);
 
 						//This regex matches /B{*} . Do not touch unless you know what you are doing.
-						let regex = /B\{[^}]*\}/;
+						let regex = /B\{[^}]*?\}/;
 
 						//find banner url in parsed bio
 						let matches = parsed.toString().match(regex);
@@ -2406,7 +2556,7 @@ module.exports = (() => {
 
 					if (this.profileRenderer == undefined) this.profileRenderer = Webpack.getAllByKeys("Z").filter((obj) => obj.Z.toString().includes("PRESS_PREMIUM_UPSELL"))[0]
 
-					BdApi.Patcher.before(this.getName(), this.profileRenderer, "Z", (_, args) => {
+					Patcher.before(this.getName(), this.profileRenderer, "Z", (_, args) => {
 						if (args == undefined) return;
 						if (args[0]?.displayProfile?.banner == undefined) return;
 
@@ -2417,7 +2567,7 @@ module.exports = (() => {
 						}
 					});
 
-					BdApi.Patcher.after(this.getName(), this.profileRenderer, "Z", (_, args, ret) => {
+					Patcher.after(this.getName(), this.profileRenderer, "Z", (_, args, ret) => {
 						if (args == undefined) return;
 						if (args[0]?.displayProfile?.banner == undefined) return;
 						if (ret == undefined) return;
@@ -2430,37 +2580,36 @@ module.exports = (() => {
 					});
 				} //End of bannerUrlDecoding()
 
+
 				//Make buttons in profile customization settings, encode imgur URLs and copy to clipboard
 				//Documented/commented and partially rewritten to use React patching on 3/6/2024
 				async bannerUrlEncoding(secondsightifyEncodeOnly) {
 
 					//wait for banner customization renderer module to be loaded
-					await Webpack.waitForModule(Webpack.Filters.byStrings("USER_SETTINGS_PROFILE_BANNER"));
-					if (this.profileBannerSectionRenderer == undefined) this.profileBannerSectionRenderer = Webpack.getAllByKeys("Z").filter((obj) => obj.Z.toString().includes("USER_SETTINGS_PROFILE_BANNER"))[0];
+					await Webpack.waitForModule(Webpack.Filters.byStrings("showRemoveBannerButton", "isTryItOutFlow", "buttonsContainer"));
+					this.profileBannerSectionRenderer = Webpack.getAllByKeys("Z").filter(obj => obj.Z.toString().includes("showRemoveBannerButton") && obj.Z.toString().includes("isTryItOutFlow") && obj.Z.toString().includes("buttonsContainer"))[0];
 
-					BdApi.Patcher.after(this.getName(), this.profileBannerSectionRenderer, "Z", (_, args, ret) => {
-
-						args[0].showPremiumIcon = false;
-
+					Patcher.after(this.getName(), this.profileBannerSectionRenderer, "Z", (_, args, ret) => {
 						//create and append profileBannerUrlInput input element.
-						ret.props.children.props.children.push(
-							BdApi.React.createElement("input", {
-								id: "profileBannerUrlInput",
-								placeholder: "Imgur URL",
-								style: {
-									width: "30%",
-									height: "20%",
-									maxHeight: "50%",
-									marginLeft: "10px",
-									marginTop: "5px"
-								}
-							})
-						);
+						let profileBannerUrlInput = React.createElement("input", {
+							id: "profileBannerUrlInput",
+							placeholder: "Imgur URL",
+							style: {
+								float: "right",
+								width: "30%",
+								height: "20%",
+								maxHeight: "50%",
+								marginTop: "auto",
+								marginBottom: "auto",
+								marginLeft: "10px"
+							}
+						});
+						ret.props.children.props.children.push(profileBannerUrlInput);
 
 						ret.props.children.props.children.push( //append Copy 3y3 button
 							//create react element
 
-							BdApi.React.createElement("button", {
+							React.createElement("button", {
 								id: "profileBannerButton",
 								children: "Copy Banner 3y3",
 								className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
@@ -2504,7 +2653,7 @@ module.exports = (() => {
 											//Fetch imgur album page
 											try {
 												const parser = new DOMParser();
-												stringToEncode = await BdApi.Net.fetch(("https://" + stringToEncode), {
+												stringToEncode = await Net.fetch(("https://" + stringToEncode), {
 													method: "GET",
 													mode: "cors"
 												}).then(res => res.text()
@@ -2517,24 +2666,24 @@ module.exports = (() => {
 													.split("?")[0]; //remove any URL parameters since we don't want or need them
 											} catch (err) {
 												ZLibrary.Logger.err("BDNitro", err);
-												ZLibrary.Toasts.error("Se produjo un error. ¿Hay varias imágenes en este álbum/galería?");
+												ZLibrary.Toasts.error("An error occurred. Are there multiple images in this album/gallery?");
 												return;
 											}
 										}
 										if (stringToEncode == "") {
-											ZLibrary.Toasts.error("Se produjo un error: no se pudo encontrar el nombre del archivo.");
-											ZLibrary.Logger.err("BDNitro", "No se pudo encontrar el nombre del archivo por algún motivo. Póngase en contacto con SrGobi.");
+											ZLibrary.Toasts.error("An error occurred: couldn't find file name.");
+											ZLibrary.Logger.err("BDNitro", "Couldn't find file name for some reason. Contact SrGobi.");
 										}
 										//add starting "B{" , remove "imgur.com/" , and add ending "}"
 										stringToEncode = "B{" + stringToEncode.replace("imgur.com/", "") + "}"
 										//finally encode the string, adding a space before it so nothing fucks up
 										encodedStr = " " + secondsightifyEncodeOnly(stringToEncode);
 										//let the user know what has happened
-										Toasts.info("¡3y3 copiado al portapapeles!");
+										Toasts.info("3y3 copied to clipboard!");
 
 										//If this is not an Imgur URL, yell at the user.
 									} else if (stringToEncode.toLowerCase().startsWith("imgur.com") == false) {
-										Toasts.warning("¡Por favor usa Imgur!");
+										Toasts.warning("Please use Imgur!");
 										return;
 									}
 
@@ -2595,19 +2744,21 @@ module.exports = (() => {
 					});
 
 					if (this.appIconButtonsModule == undefined) this.appIconButtonsModule = Webpack.getAllByKeys("Z").filter((obj) => obj.Z.toString().includes("renderCTAButtons"))[0];
-					BdApi.Patcher.before(this.getName(), this.appIconButtonsModule, "Z", (_, args) => {
+					Patcher.before(this.getName(), this.appIconButtonsModule, "Z", (_, args) => {
 						args[0].disabled = false; //force buttons clickable
 					});
 				}
+
 
 				onStart() {
 					PluginUpdater.checkForUpdate(this.getName(), this.getVersion(), this._config.info.github_raw);
 					this.saveAndUpdate();
 				}
 
+
 				onStop() {
 					CurrentUser.premiumType = ORIGINAL_NITRO_STATUS;
-					BdApi.Patcher.unpatchAll(this.getName());
+					Patcher.unpatchAll(this.getName());
 					Dispatcher.unsubscribe("COLLECTIBLES_CATEGORIES_FETCH_SUCCESS", this.storeProductsFromCategories);
 					if (document.getElementById("qualityButton")) document.getElementById("qualityButton").remove();
 					if (document.getElementById("qualityMenu")) document.getElementById("qualityMenu").remove();
@@ -2623,7 +2774,7 @@ module.exports = (() => {
 					BdApi.DOM.removeStyle("BDNitroBadges");
 					BdApi.DOM.removeStyle("UsrBGIntegration");
 					usrBgUsers = [];
-					BdApi.showNotice("Debes reiniciar BetterDiscord para deshabilitar DiscordExperiments", { type: "warning", buttons: [{ label: "Reinicia BetterDiscord", onClick: () => location.reload() }] });
+					BdApi.unlinkJS("ffmpeg.js");
 				}
 			};
 		};
