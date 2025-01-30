@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.1
+ * @version 5.6.2
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -128,7 +128,7 @@ const defaultSettings = {
 	checkForUpdates: true
 };
 
-let settings = Object.assign({}, defaultSettings, Data.load('BDNitro', 'settings'));
+let settings = {};
 
 const config = {
 	info: {
@@ -140,15 +140,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.1',
+		version: '5.6.2',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.1',
-			items: ['Fixed an error where the plugin could not start if you had a fresh config.']
+			title: '5.6.2',
+			items: ['Made the plugin startable even if your config file is invalid.', 'Implemented functionality that will automatically reset your config file to default if it ever gets corrupted or is otherwise invalid.']
 		}
 	],
 	settingsPanel: [
@@ -303,7 +303,6 @@ module.exports = class BDNitro {
 
 	saveAndUpdate() {
 		//Saves and updates settings and runs functions
-		//Utilities.saveSettings(this.meta.name, this.settings);
 		Data.save(this.meta.name, 'settings', settings);
 		Patcher.unpatchAll(this.meta.name);
 
@@ -2822,9 +2821,11 @@ module.exports = class BDNitro {
 			onConfirm: async (e) => {
 				if (remoteFile) {
 					await new Promise((r) => require('fs').writeFile(require('path').join(BdApi.Plugins.folder, `${this.meta.name}.plugin.js`), remoteFile, r));
-					let currentVersionInfo = Data.load(this.meta.name, 'currentVersionInfo');
-					currentVersionInfo.hasShownChangelog = false;
-					Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
+					try {
+						let currentVersionInfo = Data.load(this.meta.name, 'currentVersionInfo');
+						currentVersionInfo.hasShownChangelog = false;
+						Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
+					} catch (err) {}
 				}
 			}
 		});
@@ -2833,9 +2834,29 @@ module.exports = class BDNitro {
 	start() {
 		Logger.info(this.meta.name, '(v' + this.meta.version + ') has started.');
 
+		try {
+			//load settings from config
+			settings = Object.assign({}, defaultSettings, Data.load(this.meta.name, 'settings'));
+		} catch (err) {
+			//The super mega awesome data-unfucker 9000
+			Logger.warn(this.meta.name, err);
+			Logger.info(this.meta.name, 'Error parsing JSON. Resetting file to default...');
+			//watch this shit yo
+			require('fs').rmSync(require('path').join(BdApi.Plugins.folder, `${this.meta.name}.config.json`));
+			BdApi.Plugins.reload(this.meta.name);
+			BdApi.Plugins.enable(this.meta.name);
+			return;
+		}
+
 		//update check
 		try {
-			let currentVersionInfo = Object.assign({}, { version: this.meta.version, hasShownChangelog: false }, Data.load('YABDP4Nitro', 'currentVersionInfo'));
+			let currentVersionInfo = {};
+			try {
+				currentVersionInfo = Object.assign({}, { version: this.meta.version, hasShownChangelog: false }, Data.load('YABDP4Nitro', 'currentVersionInfo'));
+			} catch (err) {
+				currentVersionInfo = { version: this.meta.version, hasShownChangelog: false };
+			}
+
 			currentVersionInfo.version = this.meta.version;
 			Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
 
@@ -2862,7 +2883,7 @@ module.exports = class BDNitro {
 
 		this.saveAndUpdate();
 	}
-
+	
 	stop() {
 		CurrentUser.premiumType = ORIGINAL_NITRO_STATUS;
 		Patcher.unpatchAll(this.meta.name);
