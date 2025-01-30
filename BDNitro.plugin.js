@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.3
+ * @version 5.6.4
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -51,7 +51,6 @@ let usrBgUsers = [];
 let badgeUserIDs = [];
 let fetchedUserBg = false;
 let fetchedUserPfp = false;
-let downloadedUserProfiles = [];
 const userProfileMod = Webpack.getByKeys('getUserProfile');
 const buttonClassModule = Webpack.getByKeys('lookFilled', 'button', 'contents');
 const Dispatcher = Webpack.getByKeys('subscribe', 'dispatch');
@@ -73,7 +72,7 @@ const MessageActions = Webpack.getByKeys('jumpToMessage', '_sendMessage');
 const SelectedChannelStore = Webpack.getStore('SelectedChannelStore');
 const UserStore = Webpack.getStore('UserStore');
 const AccountDetailsClasses = Webpack.getByKeys('container', 'avatar', 'hasBuildOverride');
-const MessageEmojiReact = Webpack.getAllByKeys('Y', 'c').filter((obj) => obj.Y.toString().includes('emoji'))[0].c;
+const MessageEmojiReact = Webpack.getAllByKeys('Y', 'c').filter((obj) => obj.Y.toString().includes('emoji'))[0].Y;
 const messageRender = Webpack.getByKeys('HR', 'L5', 'ZP');
 const renderEmbedsMod = BdApi.Webpack.getByKeys('$p', 'BB', 'ZP').BB.prototype;
 //#endregion
@@ -144,15 +143,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.3',
+		version: '5.6.4',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.3',
-			items: ["Added embedding hyperlink emojis as emojis in messages, similar to Vencord's FakeNitro emojis.", 'Made the changelog appear if you update manually.']
+			title: '5.6.4',
+			items: ['Make experiments code wait for the Experiments stores to load before changing things to hopefully make it more reliable. #242.', 'Fix Fake Inline Hyperlink Emotes being too greedy and also removing embeds of linked emojis. #243.', 'Fix fake decorations not working if you put them in your bio.']
 		}
 	],
 	settingsPanel: [
@@ -755,17 +754,22 @@ module.exports = class BDNitro {
 				coreURL: ffmpegCoreURL,
 				wasmURL: ffmpegCoreWasmURL
 			});
-			console.log('FFmpeg load success!');
+			Logger.info(this.meta.name, 'FFmpeg load success!');
 		} catch (err) {
 			UI.showToast('An error occured trying to load FFmpeg.wasm. Check console for details.', { type: 'error' });
+			Logger.info(this.meta.name, 'FFmpeg failed to load. The clips bypass will not work without this unless the file is already the correct format! Error details below.');
 			Logger.error(this.meta.name, err);
 		} finally {
+			//Ensure we return window.global.define to its regular state just in case we errored during the short window where it has to be set to undefined.
 			window.global.define = defineTemp;
 		}
 	} //End of loadFFmpeg()
 
-	experiments() {
+	async experiments() {
 		try {
+			//wait for modules to be loaded, #242
+			await Webpack.waitForModule(Webpack.Filters.byStoreName('DeveloperExperimentStore'));
+			await Webpack.waitForModule(Webpack.Filters.byStoreName('ExperimentStore'));
 			//code modified from https://gist.github.com/JohannesMP/afdf27383608c3b6f20a6a072d0be93c?permalink_comment_id=4784940#gistcomment-4784940
 			let wpRequire;
 			webpackChunkdiscord_app.push([
@@ -1465,14 +1469,6 @@ module.exports = class BDNitro {
 	};
 
 	async fakeAvatarDecorations() {
-		//keep track of profiles downloaded
-		Patcher.after(this.meta.name, userProfileMod, 'getUserProfile', (_, [args], ret) => {
-			if (ret == undefined) return;
-			if (ret.userId == undefined) return;
-			if (downloadedUserProfiles[args]) return;
-			downloadedUserProfiles.push(ret.userId);
-		});
-
 		//apply decorations
 		Patcher.after(this.meta.name, UserStore, 'getUser', (_, args, ret) => {
 			//basic error checking
@@ -1483,12 +1479,10 @@ module.exports = class BDNitro {
 
 			function getRevealedText(self) {
 				let revealedTextLocal = ''; //init empty string with local scope
+				let userProfile = userProfileMod.getUserProfile(args[0]); //get the user's profile from the cached user profiles
 
 				//if this user's profile has been downloaded
-				if (downloadedUserProfiles[args[0]]) {
-					//get the user's profile from the cached user profiles
-					let userProfile = userProfileMod.getUserProfile(args[0]);
-
+				if (userProfile) {
 					//if their bio is empty, move on to the next check.
 					if (userProfile?.bio != undefined) {
 						//reveal 3y3 encoded text
@@ -1544,7 +1538,7 @@ module.exports = class BDNitro {
 					sku_id: '1144003461608906824' //dummy sku id
 				};
 
-				//add user to the list of users to show with the BDNitro user badge we haven't already.
+				//add user to the list of users to show with the YABDP4Nitro user badge if we haven't already.
 				if (!badgeUserIDs.includes(ret.id)) badgeUserIDs.push(ret.id);
 			}
 		}); //end of getUser patch for avatar decorations
@@ -1575,7 +1569,7 @@ module.exports = class BDNitro {
 			ret.props.children[0].props.children.push(
 				React.createElement('button', {
 					id: 'decorationButton',
-					children: 'Change Decoration [BDNitro]',
+					children: 'Change Decoration [YABDP4Nitro]',
 					style: {
 						width: '100px',
 						height: '50px',
@@ -1585,7 +1579,7 @@ module.exports = class BDNitro {
 					},
 					className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
 					onClick: () => {
-						UI.showConfirmationModal('Change Avatar Decoration (BDNitro)', React.createElement(DecorModal));
+						UI.showConfirmationModal('Change Avatar Decoration (YABDP4Nitro)', React.createElement(DecorModal));
 					}
 				})
 			);
@@ -2119,17 +2113,17 @@ module.exports = class BDNitro {
 	} //End of emojiBypass()
 
 	inlineFakemojiPatch() {
-		//Somehow, this is the first time I've had to actually patch message rendering.
+		//Somehow, this is the first time I've had to actually patch message rendering. (and it shows!)
 		Patcher.before(this.meta.name, messageRender.ZP, 'type', (_, [args]) => {
 			//console.log(args);
 			for (let i = 0; i < args.content.length; i++) {
 				let contentItem = args.content[i];
 
 				if (contentItem.type.type?.toString().includes('MASKED_LINK')) {
-					//is it a hyperlink? if so...
+					//is it a hyperlink?
 
 					if (contentItem.props.href.startsWith('https://cdn.discordapp.com/emojis/')) {
-						//does this hyperlink have an emoji URL? if so...
+						//does this hyperlink have an emoji URL?
 
 						let emojiName = contentItem.props?.children[0]?.props?.children;
 						if (emojiName == undefined) continue;
@@ -2138,16 +2132,17 @@ module.exports = class BDNitro {
 
 						//create discord emoji react element
 						let emoteElement = BdApi.React.createElement(MessageEmojiReact, {
-							//self explanatory arguments
 							node: {
 								name: `:${emojiName}:`,
-								src: contentItem.props.href,
+								src: contentItem.props.href.split('?')[0] + '?size=48',
 								type: 'emoji',
-								jumboable: false //makes the emoji large or small. "jumboable" is a silly name from Wumpus or some shit.
+								emojiId: contentItem.props.href.replace('https://cdn.discordapp.com/emojis/', '').split('.')[0],
+								animated: true,
+								jumboable: false //makes the emoji large or small. "jumboable" is a stupid ass name, Discord.
 							},
 							channelId: args.message.channel_id,
 							messageId: args.message.id,
-							enableClick: true
+							enableClick: true //I'm curious in what circumstance this value becomes false. Does what it says on the tin; enables or disables the emoji click menu.
 						});
 
 						//restore key
@@ -2160,6 +2155,7 @@ module.exports = class BDNitro {
 		});
 
 		//who knows what unholy compatibility issues this will bring me
+		//this code fucking sucks i think
 		Patcher.instead(this.meta.name, renderEmbedsMod, 'renderEmbeds', (_, [message], originalFunction) => {
 			//get what the original function would have returned
 			let ret = originalFunction(message);
@@ -2168,29 +2164,42 @@ module.exports = class BDNitro {
 					for (let i = 0; i < ret.length; i++) {
 						if (ret[i]) {
 							if (ret[i].props?.children?.props?.embed?.image?.url) {
-								let matches = ret[i].props.children.props.embed.image.url.startsWith('https://cdn.discordapp.com/emojis/');
+								let url = ret[i].props.children.props.embed.image.url;
+								let isEmojiHyperlink = false;
 
-								if (ret.length == 1) {
-									//if there is only 1 fakemoji
-
-									//matches and removes first instance of pattern [anyemojiname](https://cdn.discordapp.com/emojis/anynumber.ext)
-									//then checks if there is anything else in the message, and also checks if the embed image url starts with https://cdn.discordapp.com/emojis/ for some reason which idk if thats necessary but it doesnt cost much so might as well
-									if (
-										message.content
-											.replace(/\[.*?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/\d+\.(png|webp|gif).*?\)/, '') //is a regex even necessary..?
-											.trim().length > 0 &&
-										matches
-									) {
-										//if there is other stuff in the message, delete the embed
-										delete ret[i];
+								//this embed is an emoji
+								if (url.startsWith('https://cdn.discordapp.com/emojis/')) {
+									/* Is embed from a hyperlink? It can't tell if it's from a hyperlink *this time*, unfortunately,
+									 * so if someone has an emoji URL and a hyperlink with that same URL in the same message, it won't render correctly (or at least not how you might expect)!
+									 * Let's just hope nobody notices that..! I didn't have this system initially cause I'm a dumbfuck and didn't think it over.
+									 */
+									if (message.content.includes(`](${url})`)) {
+										isEmojiHyperlink = true;
 									}
-									//if there is 1 fakemoji and nothing else in the message, it will keep the regular embed (default behavior)
-									//for some reason, if the fakemoji is in a message alone, it disappears, so keeping the embed was the easiest solution
-								}
 
-								//if there is more than 1 hyperlink
-								else {
-									if (matches) delete ret[i]; //if the hyperlink is an emoji url, delete the embed
+									//if currently processed embed is an emoji and a hyperlink
+									if (isEmojiHyperlink) {
+										if (ret.length == 1) {
+											//if there is only 1 fakemoji
+
+											//removes first instance of pattern [anyemojiname](https://cdn.discordapp.com/emojis/anynumber.ext) then checks if there is anything else in the message
+											if (
+												message.content
+													.replace(/\[.*?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/\d+\.(png|webp|gif).*?\)/, '') //is regex necessary? probably.
+													.trim().length > 0
+											) {
+												//if there is other stuff in the message, delete the embed
+												delete ret[i];
+											}
+											//if there is 1 fakemoji and nothing else in the message, it will keep the regular embed (default behavior)
+											//for some reason, if the fakemoji is in a message alone, it disappears, so keeping the embed was the easiest solution
+										}
+
+										//if there is more than 1 hyperlink
+										else {
+											delete ret[i]; //if the hyperlink is an emoji url, delete the embed
+										}
+									}
 								}
 							}
 						}
@@ -2427,7 +2436,8 @@ module.exports = class BDNitro {
 		try {
 			document.getElementsByClassName(AccountDetailsClasses.container)[0].appendChild(qualityButton);
 		} catch (err) {
-			Logger.error(this.meta.name, 'What the fuck happened..? During buttonCreate() ' + err);
+			Logger.error(this.meta.name, "What the fuck happened..? Couldn't append child during buttonCreate() " + err);
+			return;
 		}
 
 		let qualityMenu = document.createElement('div');
