@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.0
+ * @version 5.6.1
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -140,24 +140,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.0',
+		version: '5.6.1',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.0',
-			items: [
-				'Removed dependency on ZeresPluginLibrary.',
-				'Fixed regression causing UsrBg profile banners to not work.',
-				'Changing emoji bypasses has been simplified into a dropdown menu instead of multiple switches.',
-				'Added a hyperlink / Vencord-like emoji bypass.',
-				'Implemented an update checker.',
-				'Added the ability to disable checking for updates on startup.',
-				'Implemented new changelog.',
-				'Fix messages not forwarding if Upload Emotes was enabled.'
-			]
+			title: '5.6.1',
+			items: ['Fixed an error where the plugin could not start if you had a fresh config.']
 		}
 	],
 	settingsPanel: [
@@ -2805,24 +2796,28 @@ module.exports = class BDNitro {
 	}
 
 	async checkForUpdate() {
-		let fileContent = await (await fetch(this.meta.updateUrl)).text();
-		let remoteMeta = this.parseMeta(fileContent);
-		let remoteVersion = remoteMeta.version.trim().split('.');
-		let currentVersion = this.meta.version.trim().split('.');
+		try {
+			let fileContent = await (await fetch(this.meta.updateUrl)).text();
+			let remoteMeta = this.parseMeta(fileContent);
+			let remoteVersion = remoteMeta.version.trim().split('.');
+			let currentVersion = this.meta.version.trim().split('.');
 
-		if (parseInt(remoteVersion[0]) > parseInt(currentVersion[0])) {
-			this.newUpdateNotify(remoteMeta, fileContent);
-		} else if (remoteVersion[0] == currentVersion[0] && parseInt(remoteVersion[1]) > parseInt(currentVersion[1])) {
-			this.newUpdateNotify(remoteMeta, fileContent);
-		} else if (remoteVersion[0] == currentVersion[0] && remoteVersion[1] == currentVersion[1] && parseInt(remoteVersion[2]) > parseInt(currentVersion[2])) {
-			this.newUpdateNotify(remoteMeta, fileContent);
+			if (parseInt(remoteVersion[0]) > parseInt(currentVersion[0])) {
+				this.newUpdateNotify(remoteMeta, fileContent);
+			} else if (remoteVersion[0] == currentVersion[0] && parseInt(remoteVersion[1]) > parseInt(currentVersion[1])) {
+				this.newUpdateNotify(remoteMeta, fileContent);
+			} else if (remoteVersion[0] == currentVersion[0] && remoteVersion[1] == currentVersion[1] && parseInt(remoteVersion[2]) > parseInt(currentVersion[2])) {
+				this.newUpdateNotify(remoteMeta, fileContent);
+			}
+		} catch (err) {
+			Logger.error(this.meta.name, err);
 		}
 	}
 
 	newUpdateNotify(remoteMeta, remoteFile) {
 		Logger.info(this.meta.name, 'A new update is available!');
 
-		UI.showConfirmationModal('Update Available', [`Update ${remoteMeta.version} is now available for BDNitro!`, 'Press Download Now to update!'], {
+		UI.showConfirmationModal('Update Available', [`Update ${remoteMeta.version} is now available for YABDP4Nitro!`, 'Press Download Now to update!'], {
 			confirmText: 'Download Now',
 			onConfirm: async (e) => {
 				if (remoteFile) {
@@ -2838,26 +2833,31 @@ module.exports = class BDNitro {
 	start() {
 		Logger.info(this.meta.name, '(v' + this.meta.version + ') has started.');
 
-		let currentVersionInfo = Data.load(this.meta.name, 'currentVersionInfo');
-		currentVersionInfo.version = this.meta.version;
-		Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
-
-		if (settings.checkForUpdates) this.checkForUpdate();
-
-		if (!currentVersionInfo.hasShownChangelog) {
-			UI.showChangelogModal({
-				title: 'BDNitro Changelog',
-				subtitle: config.changelog[0].title,
-				changes: [
-					{
-						title: config.changelog[0].title,
-						type: 'changed',
-						items: config.changelog[0].items
-					}
-				]
-			});
-			currentVersionInfo.hasShownChangelog = true;
+		//update check
+		try {
+			let currentVersionInfo = Object.assign({}, { version: this.meta.version, hasShownChangelog: false }, Data.load('YABDP4Nitro', 'currentVersionInfo'));
+			currentVersionInfo.version = this.meta.version;
 			Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
+
+			if (settings.checkForUpdates) this.checkForUpdate();
+
+			if (!currentVersionInfo.hasShownChangelog) {
+				UI.showChangelogModal({
+					title: 'YABDP4Nitro Changelog',
+					subtitle: config.changelog[0].title,
+					changes: [
+						{
+							title: config.changelog[0].title,
+							type: 'changed',
+							items: config.changelog[0].items
+						}
+					]
+				});
+				currentVersionInfo.hasShownChangelog = true;
+				Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
+			}
+		} catch (err) {
+			Logger.error(this.meta.name, err);
 		}
 
 		this.saveAndUpdate();
