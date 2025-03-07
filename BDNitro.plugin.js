@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.10
+ * @version 5.7.1
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -97,7 +97,6 @@ const TextClasses = Webpack.getByKeys('errorMessage', 'h5');
 const FormModalClasses = Webpack.getByKeys('formItemTitleSlim', 'modalContent');
 const StreamSettingsMod = Webpack.getByStrings('StreamSettings: user cannot be undefined', { defaultExport: false });
 const videoOptionFunctions = Webpack.getByPrototypeKeys('updateVideoQuality').prototype;
-const appIconModule = Webpack.getByKeys('getCurrentDesktopIcon');
 const appIconButtonsModule = Webpack.getByStrings('renderCTAButtons', { defaultExport: false });
 //#endregion
 
@@ -174,15 +173,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.10',
+		version: '5.7.1',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.10',
-			items: ['Replace deprecated function BdApi.Filters.byProps with BdApi.Filters.byKeys since it is about to be removed.', 'Replace deprecated function BdApi.getData with BdApi.Data.load since it is about to be removed.']
+			title: '5.7.1',
+			items: ['Rewrite of In-App Icons. It will no longer enable Premium Type (nor require it to be enabled), and should be much more reliable.', 'Fixed error appearing in console when switching from a gradient theme to a default theme.']
 		}
 	],
 	settingsPanel: [
@@ -334,7 +333,7 @@ const config = {
 				{ type: 'switch', id: 'clientThemes', name: 'Gradient Client Themes', note: 'Allows you to use Nitro-exclusive Client Themes.', value: () => settings.clientThemes },
 				{ type: 'switch', id: 'removeProfileUpsell', name: 'Remove Profile Customization Upsell', note: 'Removes the "Try It Out" upsell in the profile customization screen and replaces it with the Nitro variant. Note: does not allow you to use Nitro customization on Server Profiles as the API disallows this.', value: () => settings.removeProfileUpsell },
 				{ type: 'switch', id: 'removeScreenshareUpsell', name: 'Remove Screen Share Nitro Upsell', note: 'Removes the Nitro upsell in the Screen Share quality option menu.', value: () => settings.removeScreenshareUpsell },
-				{ type: 'switch', id: 'unlockAppIcons', name: 'App Icons', note: 'Unlocks app icons. Warning: enabling this will force "Change Premium Type" to be enabled.', value: () => settings.unlockAppIcons },
+				{ type: 'switch', id: 'unlockAppIcons', name: 'App Icons', note: 'Unlocks app icons.', value: () => settings.unlockAppIcons },
 				{ type: 'switch', id: 'experiments', name: 'Experiments', note: 'Unlocks experiments. Use at your own risk.', value: () => settings.experiments },
 				{ type: 'switch', id: 'checkForUpdates', name: 'Check for Updates', note: 'Should the plugin check for updates on startup?', value: () => settings.checkForUpdates }
 			]
@@ -554,7 +553,7 @@ module.exports = class BDNitro {
 
 			if (settings.emojiBypass && (feature.name == 'emojisEverywhere' || feature.name == 'animatedEmojis')) return true;
 
-			if (settings.appIcons && feature.name == 'appIcons') return true;
+			if (settings.unlockAppIcons && feature.name == 'appIcons') return true;
 
 			if (settings.removeProfileUpsell && feature.name == 'profilePremiumFeatures') return true;
 
@@ -589,18 +588,22 @@ module.exports = class BDNitro {
 	// #endregion
 
 	// #region Resolution Swapper
-	resolutionSwapper() {
-		Patcher.after(this.meta.name, StreamSettingsMod, 'Z', (_, [args], ret) => {
+	async resolutionSwapper() {
+		if (!this.StreamSettingsPanelMod) this.StreamSettingsPanelMod = await Webpack.waitForModule(Webpack.Filters.byStrings('StreamSettings: user cannot be undefined'), { defaultExport: false });
+
+		if (!this.FormModalClasses) this.FormModalClasses = Webpack.getByKeys('formItemTitleSlim', 'modalContent');
+
+		Patcher.after(this.meta.name, this.StreamSettingsPanelMod, 'Z', (_, [args], ret) => {
 			//Only if the selected preset is "Custom"
 			if (args.selectedPreset === 3) {
 				//Preparations
-				let streamQualityButtonsSection = ret.props.children.props.children.props.children[1].props.children[0].props.children;
+				const streamQualityButtonsSection = ret.props.children.props.children.props.children[1].props.children[0].props.children;
 
-				let resolutionButtonsSection = streamQualityButtonsSection[0].props;
-				let thirdResolutionButton = resolutionButtonsSection.children.props.buttons[2];
+				const resolutionButtonsSection = streamQualityButtonsSection[0].props;
+				const thirdResolutionButton = resolutionButtonsSection.children.props.buttons[2];
 
-				let fpsButtonsSection = streamQualityButtonsSection[1].props;
-				let thirdFpsButton = fpsButtonsSection.children.props.buttons[2];
+				const fpsButtonsSection = streamQualityButtonsSection[1].props;
+				const thirdFpsButton = fpsButtonsSection.children.props.buttons[2];
 
 				//make each section into arrays so we can add another element
 				resolutionButtonsSection.children = [resolutionButtonsSection.children];
@@ -612,7 +615,7 @@ module.exports = class BDNitro {
 						children: [
 							React.createElement('h1', {
 								children: 'CUSTOM RESOLUTION',
-								className: `${TextClasses.h5} ${TextClasses.eyebrow} ${FormModalClasses.formItemTitleSlim}`
+								className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
 							}),
 							React.createElement(Components.NumberInput, {
 								value: settings.CustomResolution,
@@ -635,7 +638,7 @@ module.exports = class BDNitro {
 						children: [
 							React.createElement('h1', {
 								children: 'CUSTOM FRAME RATE',
-								className: `${TextClasses.h5} ${TextClasses.eyebrow} ${FormModalClasses.formItemTitleSlim}`
+								className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
 							}),
 							React.createElement(Components.NumberInput, {
 								value: settings.CustomFPS,
@@ -683,11 +686,12 @@ module.exports = class BDNitro {
 
 	// #region Clips Bypass
 	async clipsBypass() {
-		/* If ffmpeg isn't loaded, or was unloaded for some reason,
-               when the user adds a file, make sure to load it again if it's undefined
-               If we don't do this check, then the user would have to
-               trigger saveAndUpdate or restart the plugin to
-               make ffmpeg load if it wasn't loaded properly the first time. */
+		if (!this.MP4Box) {
+			try {
+				await Webpack.getByStrings('mp4boxInputFile.boxes')();
+			} catch (e) {}
+			this.MP4Box = await Webpack.waitForModule(BdApi.Webpack.Filters.byKeys('MP4BoxStream'));
+		}
 		if (ffmpeg == undefined) await this.loadFFmpeg();
 
 		async function ffmpegTransmux(arrayBuffer, fileName = 'input.mp4') {
@@ -703,8 +707,14 @@ module.exports = class BDNitro {
 				return data.buffer;
 			}
 		}
-
 		Patcher.instead(this.meta.name, addFilesMod, 'addFiles', async (_, [args], originalFunction) => {
+			/* If ffmpeg isn't loaded, or was unloaded for some reason,
+               when the user adds a file, make sure to load it again if it's undefined
+               If we don't do this check, then the user would have to
+               trigger saveAndUpdate or restart the plugin to
+               make ffmpeg load if it wasn't loaded properly the first time. */
+			if (ffmpeg == undefined) await this.loadFFmpeg();
+
 			//for each file being added
 			for (let i = 0; i < args.files.length; i++) {
 				const currentFile = args.files[i];
@@ -716,7 +726,7 @@ module.exports = class BDNitro {
 					//if this file is an mp4 file
 					if (currentFile.file.type == 'video/mp4') {
 						let dontStopMeNow = true;
-						let mp4BoxFile = MP4Box.createFile();
+						let mp4BoxFile = this.MP4Box.createFile();
 						mp4BoxFile.onError = (e) => {
 							Logger.error(this.meta.name, e);
 							dontStopMeNow = false;
@@ -800,7 +810,7 @@ module.exports = class BDNitro {
 
 						//AVI file warning
 						if (currentFile.file.type == 'video/x-msvideo') {
-							UI.showToast('[BDNitro] NOTE: AVI Files will send, but HTML5 does not support playing AVI video codecs!', { type: 'warning' });
+							UI.showToast('[YABDP4Nitro] NOTE: AVI Files will send, but HTML5 does not support playing AVI video codecs!', { type: 'warning' });
 						}
 						try {
 							let arrayBuffer = await currentFile.file.arrayBuffer();
@@ -898,17 +908,17 @@ module.exports = class BDNitro {
 					wpRequire = req;
 				}
 			]);
-			let u = Object.values(wpRequire.c).find((x) => x?.exports?.default?.getCurrentUser && x?.exports?.default?._dispatcher?._actionHandlers).exports.default;
+			let u = Webpack.getByKeys('ASSISTANT_WUMPUS_VOICE_USER', 'default').default;
 			let m = Object.values(u._dispatcher._actionHandlers._dependencyGraph.nodes);
 
-			u.getCurrentUser().flags |= 1;
+			CurrentUser.flags |= 1;
 			m.find((x) => x.name === 'DeveloperExperimentStore').actionHandler['CONNECTION_OPEN']();
 			try {
 				m.find((x) => x.name === 'ExperimentStore').actionHandler['OVERLAY_INITIALIZE']({ user: { flags: 1 } });
 			} catch {}
 			m.find((x) => x.name === 'ExperimentStore').storeDidChange();
 		} catch (err) {
-			//Logger.error(this.meta.name, err);
+			Logger.warn(this.meta.name, err);
 		}
 	}
 	// #endregion
@@ -2872,39 +2882,26 @@ module.exports = class BDNitro {
 
 	//#region App Icons
 	appIcons() {
-		settings.changePremiumType = true; //Forcibly enable premiumType. Couldn't find a workaround, sry.
-
-		try {
-			if (!(ORIGINAL_NITRO_STATUS > 1)) {
-				CurrentUser.premiumType = 1;
-				setTimeout(() => {
-					if (settings.changePremiumType) {
-						CurrentUser.premiumType = 1;
-					}
-				}, 10000);
-			}
-		} catch (err) {
-			Logger.error(this.meta.name, 'Error occurred changing premium type. ' + err);
-		}
-
-		delete appIconModule.isUpsellPreview;
-		Object.defineProperty(appIconModule, 'isUpsellPreview', {
-			value: false,
-			configurable: true,
-			enumerable: true,
-			writable: true
-		});
-
-		delete appIconModule.isEditorOpen;
-		Object.defineProperty(appIconModule, 'isEditorOpen', {
-			value: false,
-			configurable: true,
-			enumerable: true,
-			writable: true
-		});
-
+		//technically don't need this anymore but i'll leave it in for the sake of redundancy
 		Patcher.before(this.meta.name, appIconButtonsModule, 'Z', (_, args) => {
 			args[0].disabled = false; //force buttons clickable
+		});
+
+		Patcher.instead(this.meta.name, AppIcon, 'Z', (_, __, originalFunction) => {
+			const currentDesktopIcon = CurrentDesktopIcon.getCurrentDesktopIcon();
+			if (currentDesktopIcon == 'AppIcon') {
+				return React.createElement(RegularAppIcon, {
+					size: 'custom',
+					color: 'currentColor',
+					width: 30,
+					height: 30
+				});
+			} else {
+				return React.createElement(CustomAppIcon, {
+					id: currentDesktopIcon,
+					width: 48
+				});
+			}
 		});
 	}
 	//#endregion
