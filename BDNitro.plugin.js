@@ -61,7 +61,6 @@ const AvatarDefaults = Webpack.getByKeys('getEmojiURL');
 const LadderModule = Webpack.getModule(Webpack.Filters.byKeys('calculateLadder'), { searchExports: true });
 const FetchCollectibleCategories = Webpack.getByStrings('{type:"COLLECTIBLES_CATEGORIES_FETCH"', { searchExports: true });
 let ffmpeg = undefined;
-const MP4Box = Webpack.getByKeys('MP4BoxStream');
 const udta = new Uint8Array([
 	0, 0, 0, 89, 109, 101, 116, 97, 0, 0, 0, 0, 0, 0, 0, 33, 104, 100, 108, 114, 0, 0, 0, 0, 0, 0, 0, 0, 109, 100, 105, 114, 97, 112, 112, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 105, 108, 115, 116, 0, 0, 0, 36, 169, 116, 111, 111, 0, 0, 0, 28, 100, 97, 116, 97, 0, 0, 0, 1, 0, 0, 0, 0, 76, 97, 118, 102, 54, 49, 46, 51, 46, 49, 48, 51, 0, 0, 46, 46, 117, 117, 105, 100, 161, 200, 82, 153, 51, 70, 77, 184, 136, 240,
 	131, 245, 122, 117, 165, 239
@@ -94,22 +93,16 @@ const getSoundMod = Webpack.getByKeys('getSoundById');
 const emojiMod = Webpack.getByKeys('getCustomEmojiById');
 const isEmojiAvailableMod = Webpack.getByKeys('isEmojiFilteredOrLocked');
 const TextClasses = Webpack.getByKeys('errorMessage', 'h5');
-const FormModalClasses = Webpack.getByKeys('formItemTitleSlim', 'modalContent');
-const StreamSettingsMod = Webpack.getByStrings('StreamSettings: user cannot be undefined', { defaultExport: false });
 const videoOptionFunctions = Webpack.getByPrototypeKeys('updateVideoQuality').prototype;
 const appIconButtonsModule = Webpack.getByStrings('renderCTAButtons', { defaultExport: false });
+const addFilesMod = Webpack.getByKeys('addFiles');
+const AppIcon = Webpack.getByStrings('getCurrentDesktopIcon', 'isEditorOpen', 'isPremium', { defaultExport: false });
+const RegularAppIcon = Webpack.getByStrings('M19.73 4.87a18.2', { searchExports: true });
+const CurrentDesktopIcon = Webpack.getByKeys('getCurrentDesktopIcon');
+const CustomAppIcon = Webpack.getByStrings('.iconSource,width:');
 //#endregion
 
 const defaultSettings = {
-	certified_moderator: false,
-	hypesquad: false,
-	hypesquad_house_1: false,
-	hypesquad_house_2: false,
-	hypesquad_house_3: false,
-	bug_hunter_level_1: false,
-	verified_developer: false,
-	NITRO: false,
-	early_supporter: false,
 	emojiSize: 64,
 	screenSharing: true,
 	emojiBypass: true,
@@ -810,7 +803,7 @@ module.exports = class BDNitro {
 
 						//AVI file warning
 						if (currentFile.file.type == 'video/x-msvideo') {
-							UI.showToast('[YABDP4Nitro] NOTE: AVI Files will send, but HTML5 does not support playing AVI video codecs!', { type: 'warning' });
+							UI.showToast('[BDNitro] NOTE: AVI Files will send, but HTML5 does not support playing AVI video codecs!', { type: 'warning' });
 						}
 						try {
 							let arrayBuffer = await currentFile.file.arrayBuffer();
@@ -849,8 +842,8 @@ module.exports = class BDNitro {
 		const defineTemp = window.global.define;
 
 		try {
-			const ffmpeg_js_baseurl = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/';
-			const ffmpeg_js_core_baseurl = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/';
+			const ffmpeg_js_baseurl = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.8/dist/umd/';
+			const ffmpeg_js_core_baseurl = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/';
 			//load ffmpeg worker
 			const ffmpegWorkerURL = URL.createObjectURL(await (await fetch(ffmpeg_js_baseurl + '814.ffmpeg.js', { timeout: 100000 })).blob());
 
@@ -961,8 +954,6 @@ module.exports = class BDNitro {
 							}
 						}
 					});
-					//get rid of gradient theming.
-					resetPreviewClientTheme();
 					return;
 				}
 
@@ -2386,7 +2377,6 @@ module.exports = class BDNitro {
 	//#region Streaming Unlock
 	unlockAndCustomizeStreamButtons() {
 		//Unlock stream buttons, apply custom resolution and fps, and apply stream quality bypasses
-
 		const settings = Data.load('BDNitro', 'settings'); //just in case we can't access "this";
 
 		//If custom resolution tick is disabled or custom resolution is set to 0, set it to 1440
