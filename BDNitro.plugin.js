@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.6
+ * @version 5.6.7
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -174,15 +174,19 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.6',
+		version: '5.6.7',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.6',
-			items: ['Change videoCodec setting id to videoCodec2 to force everybody to be reset to the default option since users with older configs were being set to Force AV1 when upgrading.']
+			title: '5.6.7',
+			items: [
+				'Fixed a regression where the upload emoji bypass would send doubled messages.',
+				'Fixed soundmoji text being doubled if you sent both an emoji with Upload Emotes enabled and sent a soundmoji at the same time.',
+				"Changed code in videoQualityModule that would set the video capture and video budget to the FPS and resolution in plugin settings even if you weren't using the custom quality option so that it instead sets it to the current resolution and framerate of the stream in index 0."
+			]
 		}
 	],
 	settingsPanel: [
@@ -1914,86 +1918,80 @@ module.exports = class BDNitro {
 		this.experiments();
 		this.overrideExperiment('2024-11_soundmoji_sending', 2);
 
-		Patcher.instead(this.meta.name, MessageActions, '_sendMessage', (_, msg, send) => {
-			let doDefaultSend = false;
-			//#region Upload Emoji
-			function uploadEmoteMethod(msg, send, self) {
-				if (msg[2].poll != undefined || msg[2].activityAction != undefined || msg[2].messageReference) {
-					//fix polls, activity actions, forwarding
-					doDefaultSend = true;
-					return;
-				}
+		//#region _sendMessage Patch
+		Patcher.instead(this.meta.name, MessageActions, '_sendMessage', async (_, msg, send) => {
+			if (msg[2].poll != undefined || msg[2].activityAction != undefined || msg[2].messageReference) {
+				//fix polls, activity actions, forwarding
+				send(msg[0], msg[1], msg[2], msg[3]);
+				return;
+			}
 
+			const currentChannelId = msg[0];
+			let emojis = [];
+			let emojiUrls = [];
+			//#region Upload Emojis
+			if (settings.emojiBypass && settings.emojiBypassType == 0) {
 				//SimpleDiscordCrypt compat
+				let SDCEnabled = false;
 				if (document.getElementsByClassName('sdc-tooltip').length > 0) {
 					let SDC_Tooltip = document.getElementsByClassName('sdc-tooltip')[0];
 					if (SDC_Tooltip.innerHTML == 'Disable Encryption') {
 						//SDC Encryption Enabled
-						doDefaultSend = true;
-						return;
+						SDCEnabled = true;
 					}
 				}
 
-				const currentChannelId = msg[0];
-				let runs = 0; //number of times the uploader has run for this message
-				msg[1].validNonShortcutEmojis.forEach((emoji) => {
-					if (self.emojiBypassForValidEmoji(emoji, currentChannelId)) return; //Unlocked emoji. Skip.
-					if (emoji.type == 'UNICODE') return; //If this "emoji" is actually a unicode character, it doesn't count. Skip bypassing if so.
-					if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
-					if (settings.PNGemote) {
-						emoji.forcePNG = true; //replace WEBP with PNG if the option is enabled.
-					}
-					let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
-					if (emoji.animated) {
-						emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
-					}
+				if (!SDCEnabled) {
+					msg[1].validNonShortcutEmojis.forEach(async (emoji) => {
+						if (this.emojiBypassForValidEmoji(emoji, currentChannelId)) return; //Unlocked emoji. Skip.
+						if (emoji.type == 'UNICODE') return; //If this "emoji" is actually a unicode character, it doesn't count. Skip bypassing if so.
+						if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
+						if (settings.PNGemote) {
+							emoji.forcePNG = true; //replace WEBP with PNG if the option is enabled.
+						}
+						let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
+						if (emoji.animated) {
+							emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
+						}
 
-					//If there is a backslash (\) before the emote we are processing,
-					if (msg[1].content.includes('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>')) {
-						//remove the backslash
-						msg[1].content = msg[1].content.replace('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>', '<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>');
-						//and skip bypass for that emote
-						return;
-					}
+						//If there is a backslash (\) before the emote we are processing,
+						if (msg[1].content.includes('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>')) {
+							//remove the backslash
+							msg[1].content = msg[1].content.replace('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>', '<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>');
+							//and skip bypass for that emote
+							return;
+						}
 
-					runs++; // increment number of times the uploader has run for this message.
+						//remove existing URL parameters and add custom URL parameters for user's size preference. quality is always lossless.
+						emojiUrl = emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&`;
+						//remove emote from message.
+						msg[1].content = msg[1].content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, '');
 
-					//remove existing URL parameters and add custom URL parameters for user's size preference. quality is always lossless.
-					emojiUrl = emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&`;
-					//remove emote from message.
-					msg[1].content = msg[1].content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, '');
-					//upload emote
-					self.UploadEmote(emojiUrl, currentChannelId, msg, emoji, runs);
-				});
-				if (msg[1].content !== undefined && (msg[1].content != '' || msg[2].activityAction != undefined) && runs == 0) {
-					doDefaultSend = true;
+						//queue for upload
+						emojis.push(emoji);
+						emojiUrls.push(emojiUrl);
+					});
 				}
-			}
-
-			if (settings.emojiBypass && settings.emojiBypassType == 0) {
-				uploadEmoteMethod(msg, send, this);
 			}
 			//#endregion
 
-			//#region Upload Soundmoji
-
-			function uploadSoundmojiMethod(msg, send, self) {
-				const channelId = msg[0];
-				let regex = /<sound:[0-9]\d+:[0-9]\d+>/g;
+			//#region Upload Soundmojis
+			const channelId = msg[0];
+			let regex = /<sound:[0-9]\d+:[0-9]\d+>/g;
+			let ids = [];
+			let sounds = [];
+			if (settings.soundmojiEnabled) {
 				let soundmojis = msg[1].content.match(regex);
 				if (soundmojis) {
-					let ids = [];
-					let sounds = [];
 					for (let i = 0; i < soundmojis.length; i++) {
 						let id = soundmojis[i].slice(-20, -1);
 						let sound = getSoundMod.getSoundById(id);
 						if (sound) {
 							sounds.push(sound);
 							ids.push(id);
-							let soundCode = self.secondsightifyEncodeOnly(`/snd${id}`);
 							if (sound?.emojiId == null && sound?.emojiName != null) {
 								//default / system emoji
-								msg[1].content = msg[1].content.replace(soundmojis[i], `${soundCode}( ${sound.emojiName} ${sound.name} )`);
+								msg[1].content = msg[1].content.replace(soundmojis[i], `( ${sound.emojiName} ${sound.name} )`);
 							} else if (sound?.emojiId != null) {
 								// custom emoji
 								let emoji = emojiMod.getCustomEmojiById(sound.emojiId);
@@ -2004,24 +2002,26 @@ module.exports = class BDNitro {
 							}
 						} else continue;
 					}
-					if (ids.length > 0) {
-						self.UploadSoundmojis(ids, channelId, msg[1], sounds);
-						doDefaultSend = false;
-					} else {
-						doDefaultSend = true;
+				}
+			}
+			if (settings.emojiBypass && settings.emojiBypassType == 0) {
+				if (emojis.length > 0) {
+					//upload all emotes
+					for (let i = 0; i < emojis.length; i++) {
+						await this.UploadEmote(emojiUrls[i], currentChannelId, msg, emojis[i], i);
 					}
-				} else {
-					// no soundmojis
-					doDefaultSend = true;
+					//reset message content since we dont want a repeated message if soundmoji upload happens next
+					msg[1].content = '';
 				}
 			}
 
 			if (settings.soundmojiEnabled) {
-				uploadSoundmojiMethod(msg, send, this);
+				if (sounds.length > 0) await this.UploadSoundmojis(ids, channelId, msg[1], sounds);
 			}
 
-			if (doDefaultSend) send(msg[0], msg[1], msg[2], msg[3]);
-			//#endregion
+			if (emojis.length == 0 && sounds.length == 0) {
+				send(msg[0], msg[1], msg[2], msg[3]);
+			}
 		});
 	}
 
@@ -2042,9 +2042,8 @@ module.exports = class BDNitro {
 			return;
 		});
 
-		//Upload Emotes Method
 		if (settings.emojiBypassType == 0) {
-			//#region Upload Emoji Patch
+			//#region uploadFiles Upload
 			Patcher.instead(this.meta.name, Uploader, 'uploadFiles', (_, [args], originalFunction) => {
 				if (document.getElementsByClassName('sdc-tooltip').length > 0) {
 					let SDC_Tooltip = document.getElementsByClassName('sdc-tooltip')[0];
@@ -2556,8 +2555,8 @@ module.exports = class BDNitro {
 
 			//Video quality bypasses if Custom FPS is enabled.
 			if (settings.CustomFPSEnabled) {
-				e.videoQualityManager.options.videoBudget.framerate = settings.CustomFPS;
-				e.videoQualityManager.options.videoCapture.framerate = settings.CustomFPS;
+				e.videoQualityManager.options.videoBudget.framerate = e.videoStreamParameters[0].maxFrameRate;
+				e.videoQualityManager.options.videoCapture.framerate = e.videoStreamParameters[0].maxFrameRate;
 			}
 
 			//If screen sharing bypasses are enabled,
@@ -2569,20 +2568,15 @@ module.exports = class BDNitro {
 					framerate: e.videoStreamParameters[0].maxFrameRate
 				});
 
-				if (e.stats?.camera != undefined && settings.CustomFPSEnabled) {
-					videoQuality.framerate = settings.CustomFPS;
-				}
-
 				e.remoteSinkWantsMaxFramerate = e.videoStreamParameters[0].maxFrameRate;
 
 				//janky fix to #218
-				if (videoQuality.width <= 0) {
-					videoQuality.width = 2160;
-					if (parseInt(settings.CustomResolution * (16 / 9) > 2160 * (16 / 9))) videoQuality.width = parseInt(settings.CustomResolution * (16 / 9));
-				}
 				if (videoQuality.height <= 0) {
 					videoQuality.height = 1440;
-					if (settings.CustomResolution > 1440) videoQuality.width = settings.CustomResolution;
+				}
+				if (videoQuality.width <= 0) {
+					videoQuality.width = 2160;
+					if (parseInt(e.videoStreamParameters[0].maxResolution.height * (16 / 9) > 2160 * (16 / 9))) videoQuality.width = parseInt(e.videoStreamParameters[0].maxResolution.height * (16 / 9));
 				}
 
 				//Ensure video budget and capture quality parameters match stream parameters
