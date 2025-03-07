@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.9
+ * @version 5.6.10
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -58,7 +58,7 @@ const canUserUseMod = Webpack.getMangled('.getFeatureValue(', {
 	canUserUse: Webpack.Filters.byStrings('getFeatureValue')
 });
 const AvatarDefaults = Webpack.getByKeys('getEmojiURL');
-const LadderModule = Webpack.getModule(Webpack.Filters.byProps('calculateLadder'), { searchExports: true });
+const LadderModule = Webpack.getModule(Webpack.Filters.byKeys('calculateLadder'), { searchExports: true });
 const FetchCollectibleCategories = Webpack.getByStrings('{type:"COLLECTIBLES_CATEGORIES_FETCH"', { searchExports: true });
 let ffmpeg = undefined;
 const MP4Box = Webpack.getByKeys('MP4BoxStream');
@@ -82,7 +82,7 @@ const stickerSendabilityModule = Webpack.getMangled('SENDABLE_WITH_BOOSTED_GUILD
 	getStickerSendability: Webpack.Filters.byStrings('canUseCustomStickersEverywhere'),
 	isSendableSticker: Webpack.Filters.byStrings(')=>0===')
 });
-const clientThemesModule = Webpack.getModule(Webpack.Filters.byProps('isPreview'));
+const clientThemesModule = Webpack.getModule(Webpack.Filters.byKeys('isPreview'));
 const streamSettingsMod = Webpack.getByPrototypeKeys('getCodecOptions').prototype;
 const themesModule = Webpack.getMangled('changes:{appearance:{settings:{clientThemeSettings:{', {
 	saveClientTheme: Webpack.Filters.byStrings('changes:{appearance:{settings:{clientThemeSettings:{')
@@ -174,15 +174,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.9',
+		version: '5.6.10',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.9',
-			items: ["Make Clips Bypass more reliable by checking if ffmpeg is loaded upon adding a file and triggering it to load if it isn't.", 'Fixed the screen share getting put into an infinite buffering screen when turning on or off the camera.']
+			title: '5.6.10',
+			items: ['Replace deprecated function BdApi.Filters.byProps with BdApi.Filters.byKeys since it is about to be removed.', 'Replace deprecated function BdApi.getData with BdApi.Data.load since it is about to be removed.']
 		}
 	],
 	settingsPanel: [
@@ -1418,7 +1418,7 @@ module.exports = class BDNitro {
 		if (settings.killProfileEffects) return; //profileFX is mutually exclusive with killProfileEffects (obviously)
 
 		//wait for profile effects module
-		await Webpack.waitForModule(Webpack.Filters.byProps('profileEffects', 'tryItOutId'));
+		await Webpack.waitForModule(Webpack.Filters.byKeys('profileEffects', 'tryItOutId'));
 
 		if (this.profileEffects == undefined) this.profileEffects = Webpack.getStore('ProfileEffectStore').profileEffects;
 
@@ -1701,7 +1701,7 @@ module.exports = class BDNitro {
 				})
 			);
 
-			let listOfDecorationIds = Object.keys(BdApi.getData(this.meta.name, 'settings').avatarDecorations);
+			let listOfDecorationIds = Object.keys(Data.load(this.meta.name, 'settings').avatarDecorations);
 			let avatarDecorationChildren = [];
 
 			//for each avatar decoration
@@ -2377,7 +2377,7 @@ module.exports = class BDNitro {
 	unlockAndCustomizeStreamButtons() {
 		//Unlock stream buttons, apply custom resolution and fps, and apply stream quality bypasses
 
-		const settings = BdApi.getData('BDNitro', 'settings'); //just in case we can't access "this";
+		const settings = Data.load('BDNitro', 'settings'); //just in case we can't access "this";
 
 		//If custom resolution tick is disabled or custom resolution is set to 0, set it to 1440
 		let resolutionToSet = parseInt(settings.CustomResolution);
@@ -2578,7 +2578,7 @@ module.exports = class BDNitro {
 	//Replaced DOM manipulation with React patching 4/2/2024
 	async encodeProfileColors() {
 		//wait for theme color picker module to be loaded
-		await Webpack.waitForModule(Webpack.Filters.byProps('getTryItOutThemeColors'));
+		await Webpack.waitForModule(Webpack.Filters.byKeys('getTryItOutThemeColors'));
 
 		//wait for color picker renderer module to be loaded
 		await Webpack.waitForModule(Webpack.Filters.byStrings('__invalid_profileThemesSection'));
