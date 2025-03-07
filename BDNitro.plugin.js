@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.4
+ * @version 5.6.5
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -18,11 +18,11 @@
     var pathSelf = WScript.ScriptFullName;
     // Put the user at ease by addressing them in the first person
     shell.Popup("It looks like you've mistakenly tried to run me directly. \n(Don't do that!)", 0, "I'm a plugin for BetterDiscord", 0x30);
-    if(fs.GetParentFolderName(pathSelf) === fs.GetAbsolutePathName(pathPlugins)) {
+    if(fs.GetParentFolderName(pathSelf) === fs.GetAbsolutePathName(pathPlugins)){
         shell.Popup("I'm in the correct folder already.", 0, "I'm already installed", 0x40);
-    } else if(!fs.FolderExists(pathPlugins)) {
+    }else if(!fs.FolderExists(pathPlugins)){
         shell.Popup("I can't find the BetterDiscord plugins folder.\nAre you sure it's even installed?", 0, "Can't install myself", 0x10);
-    } else if(shell.Popup("Should I copy myself to BetterDiscord's plugins folder for you?", 0, "Do you need some help?", 0x34) === 6) {
+    }else if(shell.Popup("Should I copy myself to BetterDiscord's plugins folder for you?", 0, "Do you need some help?", 0x34) === 6){
         fs.CopyFile(pathSelf, fs.BuildPath(pathPlugins, fs.GetFileName(pathSelf)), true);
         // Show the user where to put plugins in the future
         shell.Exec("explorer " + pathPlugins);
@@ -32,32 +32,34 @@
 
 @else@*/
 
-//#region
-const { Webpack, Patcher, Net, React, UI, Logger, Data } = BdApi;
-const StreamButtons = Webpack.getByKeys('L9', 'LY', 'ND', 'WC', 'aW', 'af');
-const ApplicationStreamResolutions = StreamButtons.LY;
-const ApplicationStreamSettingRequirements = StreamButtons.ND;
-const ApplicationStreamResolutionButtons = StreamButtons.WC;
-const ApplicationStreamFPSButtonsWithSuffixLabel = StreamButtons.af;
-const ApplicationStreamFPSButtons = StreamButtons.k0;
-const ApplicationStreamResolutionButtonsWithSuffixLabel = StreamButtons.km;
-const ApplicationStreamFPS = StreamButtons.ws;
-const CloudUploader = Webpack.getByKeys('m', 'n').n;
+//#region Module Hell
+const { Webpack, Patcher, Net, React, UI, Logger, Data, Components, DOM } = BdApi;
+const StreamButtons = Webpack.getMangled('RESOLUTION_1080', {
+	ApplicationStreamFPS: Webpack.Filters.byKeys('FPS_30'),
+	ApplicationStreamFPSButtons: (o) => Array.isArray(o) && typeof o[0]?.label === 'number' && o[0]?.value === 15,
+	ApplicationStreamFPSButtonsWithSuffixLabel: (o) => Array.isArray(o) && typeof o[0]?.label === 'string' && o[0]?.value === 15,
+	ApplicationStreamResolutionButtons: (o) => Array.isArray(o) && o[0]?.value !== undefined,
+	ApplicationStreamResolutionButtonsWithSuffixLabel: (o) => Array.isArray(o) && o[0]?.label === '480p',
+	ApplicationStreamResolutions: Webpack.Filters.byKeys('RESOLUTION_1080'),
+	ApplicationStreamSettingRequirements: (o) => Array.isArray(o) && o[0]?.resolution !== undefined,
+	getApplicationResolution: Webpack.Filters.byStrings('"Unknown resolution: ".concat('),
+	getApplicationFramerate: Webpack.Filters.byStrings('"Unknown frame rate: ".concat(')
+});
+const { ApplicationStreamFPS, ApplicationStreamFPSButtons, ApplicationStreamFPSButtonsWithSuffixLabel, ApplicationStreamResolutionButtons, ApplicationStreamResolutionButtonsWithSuffixLabel, ApplicationStreamResolutions, ApplicationStreamSettingRequirements } = StreamButtons;
+const CloudUploader = Webpack.getModule(Webpack.Filters.byPrototypeKeys('uploadFileToCloud'), { searchExports: true });
 const Uploader = Webpack.getByKeys('uploadFiles', 'upload');
 const CurrentUser = Webpack.getByKeys('getCurrentUser').getCurrentUser();
 const ORIGINAL_NITRO_STATUS = CurrentUser.premiumType;
 const getBannerURL = Webpack.getByPrototypeKeys('getBannerURL').prototype;
-let usrBgUsers = [];
-let badgeUserIDs = [];
-let fetchedUserBg = false;
-let fetchedUserPfp = false;
 const userProfileMod = Webpack.getByKeys('getUserProfile');
 const buttonClassModule = Webpack.getByKeys('lookFilled', 'button', 'contents');
 const Dispatcher = Webpack.getByKeys('subscribe', 'dispatch');
-const canUserUseMod = Webpack.getByKeys('$0', 'ks');
+const canUserUseMod = Webpack.getMangled('.getFeatureValue(', {
+	canUserUse: Webpack.Filters.byStrings('getFeatureValue')
+});
 const AvatarDefaults = Webpack.getByKeys('getEmojiURL');
 const LadderModule = Webpack.getModule(Webpack.Filters.byProps('calculateLadder'), { searchExports: true });
-const FetchCollectibleCategories = Webpack.getByKeys('B1', 'DR', 'F$', 'K$').F$;
+const FetchCollectibleCategories = Webpack.getByStrings('{type:"COLLECTIBLES_CATEGORIES_FETCH"', { searchExports: true });
 let ffmpeg = undefined;
 const MP4Box = Webpack.getByKeys('MP4BoxStream');
 const udta = new Uint8Array([
@@ -71,10 +73,32 @@ const ChannelStore = Webpack.getStore('ChannelStore');
 const MessageActions = Webpack.getByKeys('jumpToMessage', '_sendMessage');
 const SelectedChannelStore = Webpack.getStore('SelectedChannelStore');
 const UserStore = Webpack.getStore('UserStore');
-const AccountDetailsClasses = Webpack.getByKeys('container', 'avatar', 'hasBuildOverride');
-const MessageEmojiReact = Webpack.getAllByKeys('Y', 'c').filter((obj) => obj.Y.toString().includes('emoji'))[0].Y;
-const messageRender = Webpack.getByKeys('HR', 'L5', 'ZP');
-const renderEmbedsMod = BdApi.Webpack.getByKeys('$p', 'BB', 'ZP').BB.prototype;
+const MessageEmojiReact = Webpack.getByStrings(',nudgeAlignIntoViewport:!0,position:', 'jumboable?', { searchExports: true });
+const renderEmbedsMod = Webpack.getByPrototypeKeys('renderSocialProofingFileSizeNitroUpsell', { searchExports: true }).prototype;
+const messageRender = Webpack.getMangled('.SEND_FAILED,', {
+	renderMessage: (o) => typeof o === 'object'
+});
+const stickerSendabilityModule = Webpack.getMangled('SENDABLE_WITH_BOOSTED_GUILD', {
+	getStickerSendability: Webpack.Filters.byStrings('canUseCustomStickersEverywhere'),
+	isSendableSticker: Webpack.Filters.byStrings(')=>0===')
+});
+const clientThemesModule = Webpack.getModule(Webpack.Filters.byProps('isPreview'));
+const streamSettingsMod = Webpack.getByPrototypeKeys('getCodecOptions').prototype;
+const themesModule = Webpack.getMangled('changes:{appearance:{settings:{clientThemeSettings:{', {
+	saveClientTheme: Webpack.Filters.byStrings('changes:{appearance:{settings:{clientThemeSettings:{')
+});
+const accountSwitchModule = Webpack.getByKeys('startSession', 'login');
+const getAvatarUrlModule = Webpack.getByPrototypeKeys('getAvatarURL').prototype;
+const fetchProfileEffects = Webpack.getByStrings('USER_PROFILE_EFFECTS_FETCH', { searchExports: true });
+const getSoundMod = Webpack.getByKeys('getSoundById');
+const emojiMod = Webpack.getByKeys('getCustomEmojiById');
+const isEmojiAvailableMod = Webpack.getByKeys('isEmojiFilteredOrLocked');
+const TextClasses = Webpack.getByKeys('errorMessage', 'h5');
+const FormModalClasses = Webpack.getByKeys('formItemTitleSlim', 'modalContent');
+const StreamSettingsMod = Webpack.getByStrings('StreamSettings: user cannot be undefined', { defaultExport: false });
+const videoOptionFunctions = Webpack.getByPrototypeKeys('updateVideoQuality').prototype;
+const appIconModule = Webpack.getByKeys('getCurrentDesktopIcon');
+const appIconButtonsModule = Webpack.getByStrings('renderCTAButtons', { defaultExport: false });
 //#endregion
 
 const defaultSettings = {
@@ -103,12 +127,12 @@ const defaultSettings = {
 	maxBitrate: -1,
 	targetBitrate: -1,
 	voiceBitrate: -1,
-	ResolutionSwapper: false,
+	ResolutionSwapper: true,
 	stickerBypass: false,
 	profileV2: false,
 	forceStickersUnlocked: false,
 	changePremiumType: false,
-	// "videoCodec": 0,
+	videoCodec: -1,
 	clientThemes: true,
 	lastGradientSettingStore: -1,
 	fakeProfileThemes: true,
@@ -128,11 +152,18 @@ const defaultSettings = {
 	alwaysTransmuxClips: false,
 	forceClip: false,
 	checkForUpdates: true,
-	fakeInlineVencordEmotes: true
+	fakeInlineVencordEmotes: true,
+	soundmojiEnabled: true
 };
 
+//Plugin-wide variables
 let settings = {};
+let usrBgUsers = [];
+let badgeUserIDs = [];
+let fetchedUserBg = false;
+let fetchedUserPfp = false;
 
+// #region Config
 const config = {
 	info: {
 		name: 'BDNitro',
@@ -143,15 +174,27 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.4',
+		version: '5.6.5',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.4',
-			items: ['Make experiments code wait for the Experiments stores to load before changing things to hopefully make it more reliable. #242.', 'Fix Fake Inline Hyperlink Emotes being too greedy and also removing embeds of linked emojis. #243.', 'Fix fake decorations not working if you put them in your bio.']
+			title: '5.6.5',
+			items: [
+				'Finally add back the option to force a specific video codec to be used during screenshare but this time it actually works. For advanced users only.',
+				'Add Soundmoji Bypass.',
+				'Completely replace old Stream Settings Quick Swapper with a much better version of it which can now be found within the stream settings modal.',
+				"Restore Profile section of settings. For some reason nobody mentioned that it was gone, and I didn't notice I forgot to add it when remaking the settings panel. Oops.",
+				'Massive thanks to Arven (zrodevkaan) for all the help in learning how to use getMangled, providing a handful of improved module filters, and teaching me some better ways to fetch modules!',
+				'Replaced most, if not all old shitty module filters with improved ones.',
+				"Moved most module fetches that weren't at the top of the file to the top, excluding those which load asynchronously.",
+				"Removed repeated code previously in both updateQuick and customVideoSettings, now it's only in a new function called unlockAndCustomizeStreamButtons.",
+				'Added region markers to the code so that it is 100x easier to find stuff in the plugin when using a code editor e.g. VSCode.',
+				'Random small code improvements in a few places.',
+				'Reformat code  -- remove several unnecessary spaces.'
+			]
 		}
 	],
 	settingsPanel: [
@@ -185,12 +228,31 @@ const config = {
 				{ type: 'text', id: 'CustomResolution', name: 'Resolution', note: 'The custom resolution you want (in pixels)', value: () => settings.CustomResolution },
 				{ type: 'switch', id: 'CustomFPSEnabled', name: 'Custom Screenshare FPS', note: 'Choose your own screen share FPS!', value: () => settings.CustomFPSEnabled },
 				{ type: 'text', id: 'CustomFPS', name: 'FPS', note: 'The custom FPS you want to stream at.', value: () => settings.CustomFPS },
-				{ type: 'switch', id: 'ResolutionSwapper', name: 'Stream Settings Quick Swapper', note: 'Adds a button that will let you switch your resolution quickly!', value: () => settings.ResolutionSwapper },
+				{ type: 'switch', id: 'ResolutionSwapper', name: 'Stream Settings Quick Swapper', note: 'Lets you change your custom resolution and FPS quickly in the stream settings modal!', value: () => settings.ResolutionSwapper },
 				{ type: 'switch', id: 'CustomBitrateEnabled', name: 'Custom Bitrate', note: 'Choose the bitrate for your streams!', value: () => settings.CustomBitrateEnabled },
 				{ type: 'text', id: 'minBitrate', name: 'Minimum Bitrate', note: 'The minimum bitrate (in kbps). If this is set to a negative number, the Discord default of 150kbps will be used.', value: () => settings.minBitrate },
 				{ type: 'text', id: 'targetBitrate', name: 'Target Bitrate', note: 'The target bitrate (in kbps). If this is set to a negative number, the Discord default of 600kbps will be used.', value: () => settings.targetBitrate },
 				{ type: 'text', id: 'maxBitrate', name: 'Maximum Bitrate', note: 'The maximum bitrate (in kbps). If this is set to a negative number, the Discord default of 2500kbps will be used.', value: () => settings.maxBitrate },
-				{ type: 'text', id: 'voiceBitrate', name: 'Voice Audio Bitrate', note: "Allows you to change the voice bitrate to whatever you want. Does not allow you to go over the voice channel's set bitrate but it does allow you to go much lower. (bitrate in kbps). Disabled if this is set to 128 or -1.", value: () => settings.voiceBitrate }
+				{ type: 'text', id: 'voiceBitrate', name: 'Voice Audio Bitrate', note: "Allows you to change the voice bitrate to whatever you want. Does not allow you to go over the voice channel's set bitrate but it does allow you to go much lower. (bitrate in kbps). Disabled if this is set to 128 or -1.", value: () => settings.voiceBitrate },
+				{
+					type: 'dropdown',
+					id: 'videoCodec',
+					name: 'Force Video Codec (Advanced Users Only)',
+					note: `
+                    Allows you to force a specified video codec to be used. Normally, Discord would automatically 
+                    choose this based on your hardware, options in Voice & Video, and the viewers watching.
+                    Mobile and Web clients can only view H.264 and VP8 streams.
+                    If a client does not support the codec you choose, the stream will infinitely load for them!`,
+					value: () => settings.videoCodec,
+					options: [
+						{ label: 'Default (recommended, automatic)', value: -1 },
+						{ label: 'AV1', value: 0 },
+						{ label: 'H265', value: 1 },
+						{ label: 'H264', value: 2 },
+						{ label: 'VP8', value: 3 },
+						{ label: 'VP9', value: 4 }
+					]
+				}
 			]
 		},
 		{
@@ -239,7 +301,26 @@ const config = {
 				{ type: 'switch', id: 'stickerBypass', name: 'Sticker Bypass', note: "Enable or disable using the sticker bypass. I recommend using An00nymushun's DiscordFreeStickers over this. Animated APNG/WEBP/Lottie Stickers WILL NOT animate.", value: () => settings.stickerBypass },
 				{ type: 'switch', id: 'uploadStickers', name: 'Upload Stickers', note: 'Upload stickers in the same way as emotes.', value: () => settings.uploadStickers },
 				{ type: 'switch', id: 'forceStickersUnlocked', name: 'Force Stickers Unlocked', note: 'Enable to cause Stickers to be unlocked.', value: () => settings.forceStickersUnlocked },
-				{ type: 'switch', id: 'fakeInlineVencordEmotes', name: 'Fake Inline Hyperlink Emotes', note: 'Makes hyperlinked emojis appear as if they were real emojis, inlined in the message, similar to Vencord FakeNitro emotes.', value: () => settings.fakeInlineVencordEmotes }
+				{ type: 'switch', id: 'fakeInlineVencordEmotes', name: 'Fake Inline Hyperlink Emotes', note: 'Makes hyperlinked emojis appear as if they were real emojis, inlined in the message, similar to Vencord FakeNitro emotes.', value: () => settings.fakeInlineVencordEmotes },
+				{ type: 'switch', id: 'soundmojiEnabled', name: 'Soundmoji Bypass', note: 'Unlocks soundmojis and allows you to "send" them by automatically replacing them with a MP3 upload and some special text that will make them render as real soundmojis on the client side.', value: () => settings.soundmojiEnabled }
+			]
+		},
+		{
+			type: 'category',
+			id: 'profile',
+			name: 'Profile',
+			collapsible: true,
+			shown: false,
+			settings: [
+				{ type: 'switch', id: 'profileV2', name: 'Profile Accents', note: 'When enabled, you will see (almost) all users with the new Nitro-exclusive look for profiles (the sexier look). When disabled, the default behavior is used. Does not allow you to update your profile accent.', value: () => settings.profileV2 },
+				{ type: 'switch', id: 'fakeProfileThemes', name: 'Fake Profile Themes', note: 'Uses invisible 3y3 encoding to allow profile theming by hiding the colors in your bio.', value: () => settings.fakeProfileThemes },
+				{ type: 'switch', id: 'fakeProfileBanners', name: 'Fake Profile Banners', note: 'Uses invisible 3y3 encoding to allow setting profile banners by hiding the image URL in your bio. Only supports Imgur URLs for security reasons.', value: () => settings.fakeProfileBanners },
+				{ type: 'switch', id: 'userBgIntegration', name: 'UserBG Integration', note: 'Downloads and parses the UserBG JSON database so that UserBG banners will appear for you.', value: () => settings.userBgIntegration },
+				{ type: 'switch', id: 'fakeAvatarDecorations', name: 'Fake Avatar Decorations', note: 'Uses invisible 3y3 encoding to allow setting avatar decorations by hiding information in your bio and/or your custom status.', value: () => settings.fakeAvatarDecorations },
+				{ type: 'switch', id: 'profileEffects', name: 'Fake Profile Effects', note: 'Uses invisible 3y3 encoding to allow setting profile effects by hiding information in your bio.', value: () => settings.profileEffects },
+				{ type: 'switch', id: 'killProfileEffects', name: 'Kill Profile Effects', note: "Hate profile effects? Enable this and they'll be gone. All of them. Overrides all profile effects.", value: () => settings.killProfileEffects },
+				{ type: 'switch', id: 'customPFPs', name: 'Fake Profile Pictures', note: 'Uses invisible 3y3 encoding to allow setting custom profile pictures by hiding an image URL IN YOUR CUSTOM STATUS. Only supports Imgur URLs for security reasons.', value: () => settings.customPFPs },
+				{ type: 'switch', id: 'userPfpIntegration', name: 'UserPFP Integration', note: "Imports the UserPFP database so that people who have profile pictures in the UserPFP database will appear with their UserPFP profile picture. There's little reason to disable this.", value: () => settings.userPfpIntegration }
 			]
 		},
 		{
@@ -273,7 +354,9 @@ const config = {
 	],
 	main: 'BDNitro.plugin.js'
 };
+// #endregion
 
+// #region Exports
 module.exports = class BDNitro {
 	constructor(meta) {
 		this.meta = meta;
@@ -305,9 +388,11 @@ module.exports = class BDNitro {
 		});
 	}
 
+	// #region Save and Update
 	saveAndUpdate() {
 		//Saves and updates settings and runs functions
 		Data.save(this.meta.name, 'settings', settings);
+
 		Patcher.unpatchAll(this.meta.name);
 
 		if (settings.changePremiumType) {
@@ -329,23 +414,9 @@ module.exports = class BDNitro {
 		if (settings.CustomFPS == 30) settings.CustomFPS = 31;
 		if (settings.CustomFPS == 5) settings.CustomFPS = 6;
 
-		if (document.getElementById('qualityButton')) document.getElementById('qualityButton').remove();
-		if (document.getElementById('qualityMenu')) document.getElementById('qualityMenu').remove();
-		if (document.getElementById('qualityInput')) document.getElementById('qualityInput').remove();
-
 		if (settings.ResolutionSwapper) {
 			try {
-				this.buttonCreate(); //Fast Quality Button and Menu
-			} catch (err) {
-				Logger.error(this.meta.name, err);
-			}
-			try {
-				document.getElementById('qualityInput').addEventListener('input', this.updateQuick);
-				document.getElementById('qualityInputFPS').addEventListener('input', this.updateQuick);
-				if (!settings.ResolutionSwapper) {
-					if (document.getElementById('qualityButton') != undefined) document.getElementById('qualityButton').style.display = 'none';
-					if (document.getElementById('qualityMenu') != undefined) document.getElementById('qualityMenu').style.display = 'none';
-				}
+				this.resolutionSwapper();
 			} catch (err) {
 				Logger.error(this.meta.name, err);
 			}
@@ -359,27 +430,17 @@ module.exports = class BDNitro {
 			}
 		}
 
+		if (settings.forceStickersUnlocked || settings.stickerBypass) {
+			try {
+				this.unlockStickers();
+			} catch (err) {
+				Logger.error(this.meta.name, err);
+			}
+		}
+
 		if (settings.emojiBypass) {
 			try {
 				this.emojiBypass();
-
-				if (this.emojiMods == undefined) this.emojiMods = Webpack.getByKeys('isEmojiFilteredOrLocked');
-
-				Patcher.instead(this.meta.name, this.emojiMods, 'isEmojiFilteredOrLocked', () => {
-					return false;
-				});
-				Patcher.instead(this.meta.name, this.emojiMods, 'isEmojiDisabled', () => {
-					return false;
-				});
-				Patcher.instead(this.meta.name, this.emojiMods, 'isEmojiFiltered', () => {
-					return false;
-				});
-				Patcher.instead(this.meta.name, this.emojiMods, 'isEmojiPremiumLocked', () => {
-					return false;
-				});
-				Patcher.instead(this.meta.name, this.emojiMods, 'getEmojiUnavailableReason', () => {
-					return;
-				});
 			} catch (err) {
 				Logger.error(this.meta.name, err);
 			}
@@ -409,18 +470,6 @@ module.exports = class BDNitro {
 			}
 		}
 
-		if (settings.forceStickersUnlocked) {
-			if (this.stickerSendabilityModule == undefined) this.stickerSendabilityModule = Webpack.getByKeys('cO', 'eb', 'kl');
-			//getStickerSendability
-			Patcher.instead(this.meta.name, this.stickerSendabilityModule, 'cO', () => {
-				return 0;
-			});
-			//isSendableSticker
-			Patcher.instead(this.meta.name, this.stickerSendabilityModule, 'kl', () => {
-				return true;
-			});
-		}
-
 		if (settings.clientThemes) {
 			try {
 				this.clientThemes();
@@ -438,11 +487,11 @@ module.exports = class BDNitro {
 			}
 		}
 
-		BdApi.DOM.removeStyle(this.meta.name);
+		DOM.removeStyle(this.meta.name);
 
 		if (settings.removeScreenshareUpsell) {
 			try {
-				BdApi.DOM.addStyle(
+				DOM.addStyle(
 					this.meta.name,
 					`
                 [class*="upsellBanner"] {
@@ -455,13 +504,13 @@ module.exports = class BDNitro {
 			}
 		}
 
-		BdApi.DOM.removeStyle('UsrBGIntegration');
+		DOM.removeStyle('UsrBGIntegration');
 
 		if (settings.fakeProfileBanners) {
 			this.bannerUrlDecoding();
 			this.bannerUrlEncoding(this.secondsightifyEncodeOnly);
 			if (settings.userBgIntegration) {
-				BdApi.DOM.addStyle(
+				DOM.addStyle(
 					'UsrBGIntegration',
 					`
                     :is([class*="userProfile"], [class*="userPopout"]) [class*="bannerPremium"] {
@@ -506,7 +555,7 @@ module.exports = class BDNitro {
 			}
 		}
 
-		BdApi.DOM.removeStyle('BDNitroBadges');
+		DOM.removeStyle('BDNitroBadges');
 		try {
 			this.LoadingBadges();
 		} catch (err) {
@@ -530,20 +579,18 @@ module.exports = class BDNitro {
 			}
 		}
 
-		//Name changed from "canUserUse"
-		Patcher.instead(this.meta.name, canUserUseMod, 'ks', (_, [feature, user], originalFunction) => {
-			if (settings.emojiBypass && (feature.name == 'emojisEverywhere' || feature.name == 'animatedEmojis')) {
-				return true;
-			}
-			if (settings.appIcons && feature.name == 'appIcons') {
-				return true;
-			}
-			if (settings.removeProfileUpsell && feature.name == 'profilePremiumFeatures') {
-				return true;
-			}
-			if (settings.clientThemes && feature.name == 'clientThemes') {
-				return true;
-			}
+		Patcher.instead(this.meta.name, canUserUseMod, 'canUserUse', (_, [feature, user], originalFunction) => {
+			//return true;
+
+			if (settings.emojiBypass && (feature.name == 'emojisEverywhere' || feature.name == 'animatedEmojis')) return true;
+
+			if (settings.appIcons && feature.name == 'appIcons') return true;
+
+			if (settings.removeProfileUpsell && feature.name == 'profilePremiumFeatures') return true;
+
+			if (settings.clientThemes && feature.name == 'clientThemes') return true;
+			if (settings.soundmojiEnabled && feature.name == 'soundboardEverywhere') return true;
+
 			return originalFunction(feature, user);
 		});
 
@@ -564,7 +611,96 @@ module.exports = class BDNitro {
 		if (settings.fakeInlineVencordEmotes) {
 			this.inlineFakemojiPatch();
 		}
+
+		if (settings.soundmojiEnabled || (settings.emojiBypass && settings.emojiBypassType == 0)) this._sendMessageInsteadPatch();
+
+		if (settings.videoCodec > -1) this.videoCodecs();
 	} //End of saveAndUpdate()
+	// #endregion
+
+	// #region Resolution Swapper
+	resolutionSwapper() {
+		Patcher.after(this.meta.name, StreamSettingsMod, 'Z', (_, [args], ret) => {
+			//Only if the selected preset is "Custom"
+			if (args.selectedPreset === 3) {
+				//Preparations
+				let streamQualityButtonsSection = ret.props.children.props.children.props.children[1].props.children[0].props.children;
+
+				let resolutionButtonsSection = streamQualityButtonsSection[0].props;
+				let thirdResolutionButton = resolutionButtonsSection.children.props.buttons[2];
+
+				let fpsButtonsSection = streamQualityButtonsSection[1].props;
+				let thirdFpsButton = fpsButtonsSection.children.props.buttons[2];
+
+				//make each section into arrays so we can add another element
+				resolutionButtonsSection.children = [resolutionButtonsSection.children];
+				fpsButtonsSection.children = [fpsButtonsSection.children];
+
+				//Resolution input
+				resolutionButtonsSection.children.push(
+					React.createElement('div', {
+						children: [
+							React.createElement('h1', {
+								children: 'CUSTOM RESOLUTION',
+								className: `${TextClasses.h5} ${TextClasses.eyebrow} ${FormModalClasses.formItemTitleSlim}`
+							}),
+							React.createElement(Components.NumberInput, {
+								value: settings.CustomResolution,
+								onChange: (input) => {
+									settings.CustomResolution = input;
+									//updates visual
+									thirdResolutionButton.value = input;
+									//sets values and saves to settings
+									this.unlockAndCustomizeStreamButtons();
+									//simulate click on button -- serves to both select it and to make react re-render it.
+									thirdResolutionButton.onClick();
+								}
+							})
+						]
+					})
+				);
+
+				fpsButtonsSection.children.push(
+					React.createElement('div', {
+						children: [
+							React.createElement('h1', {
+								children: 'CUSTOM FRAME RATE',
+								className: `${TextClasses.h5} ${TextClasses.eyebrow} ${FormModalClasses.formItemTitleSlim}`
+							}),
+							React.createElement(Components.NumberInput, {
+								value: settings.CustomFPS,
+								onChange: (input) => {
+									settings.CustomFPS = input;
+									//updates visual
+									thirdFpsButton.value = input;
+									//sets values and saves to settings
+									this.unlockAndCustomizeStreamButtons();
+									//simulate click on button -- serves to both select it and to make react re-render it.
+									thirdFpsButton.onClick();
+								}
+							})
+						]
+					})
+				);
+			}
+		});
+	}
+	// #endregion
+
+	unlockStickers() {
+		Patcher.instead(this.meta.name, stickerSendabilityModule, 'getStickerSendability', () => {
+			return 0; //SENDABLE
+		});
+		Patcher.instead(this.meta.name, stickerSendabilityModule, 'isSendableSticker', () => {
+			return true;
+		});
+	}
+
+	videoCodecs() {
+		Patcher.after(this.meta.name, streamSettingsMod, 'getCodecOptions', (_, args, ret) => {
+			ret.videoEncoder = ret.videoDecoders[settings.videoCodec];
+		});
+	}
 
 	overrideExperiment(type, bucket) {
 		//console.log("applying experiment override " + type + "; bucket " + bucket);
@@ -575,6 +711,7 @@ module.exports = class BDNitro {
 		});
 	}
 
+	// #region Clips Bypass
 	async clipsBypass() {
 		if (ffmpeg == undefined) await this.loadFFmpeg();
 
@@ -717,26 +854,31 @@ module.exports = class BDNitro {
 					currentFile.platform = 1;
 				}
 			}
-
 			originalFunction(args);
 		});
 	} //End of clipsBypass()
+	// #endregion
 
+	// #region Load FFmpeg.js
 	async loadFFmpeg() {
 		const defineTemp = window.global.define;
 
 		try {
+			const ffmpeg_js_baseurl = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/';
+			const ffmpeg_js_core_baseurl = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/';
 			//load ffmpeg worker
-			const ffmpegWorkerURL = URL.createObjectURL(await (await fetch('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/814.ffmpeg.js', { timeout: 100000 })).blob());
+			const ffmpegWorkerURL = URL.createObjectURL(await (await fetch(ffmpeg_js_baseurl + '814.ffmpeg.js', { timeout: 100000 })).blob());
 
 			//load FFmpeg.WASM
-			let ffmpegSrc = await (await fetch('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js')).text();
+			let ffmpegSrc = await (await fetch(ffmpeg_js_baseurl + 'ffmpeg.js')).text();
 
 			//patch worker URL in the source of ffmpeg.js (why is this a problem lmao)
 			ffmpegSrc = ffmpegSrc.replace(`new URL(e.p+e.u(814),e.b)`, `"${ffmpegWorkerURL.toString()}"`);
 			//blob ffmpeg
 			const ffmpegURL = URL.createObjectURL(new Blob([ffmpegSrc]));
 
+			// for some reason, for ffmpeg.js to work we need to set global define to undefined temporarily.
+			// since for a brief moment it is undefined, any function that uses it may throw an error during that window.
 			window.global.define = undefined;
 
 			//deprecated function, but uhhhh fuck you we need it
@@ -746,9 +888,9 @@ module.exports = class BDNitro {
 
 			ffmpeg = new FFmpegWASM.FFmpeg();
 
-			const ffmpegCoreURL = URL.createObjectURL(await (await fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js', { timeout: 100000 })).blob());
+			const ffmpegCoreURL = URL.createObjectURL(await (await fetch(ffmpeg_js_core_baseurl + 'ffmpeg-core.js', { timeout: 100000 })).blob());
 
-			const ffmpegCoreWasmURL = URL.createObjectURL(await (await fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm', { timeout: 100000 })).blob());
+			const ffmpegCoreWasmURL = URL.createObjectURL(await (await fetch(ffmpeg_js_core_baseurl + 'ffmpeg-core.wasm', { timeout: 100000 })).blob());
 
 			await ffmpeg.load({
 				coreURL: ffmpegCoreURL,
@@ -764,13 +906,15 @@ module.exports = class BDNitro {
 			window.global.define = defineTemp;
 		}
 	} //End of loadFFmpeg()
+	// #endregion
 
+	// #region Experiments
 	async experiments() {
 		try {
-			//wait for modules to be loaded, #242
+			//wait for modules to be loaded
 			await Webpack.waitForModule(Webpack.Filters.byStoreName('DeveloperExperimentStore'));
 			await Webpack.waitForModule(Webpack.Filters.byStoreName('ExperimentStore'));
-			//code modified from https://gist.github.com/JohannesMP/afdf27383608c3b6f20a6a072d0be93c?permalink_comment_id=4784940#gistcomment-4784940
+			//code slightly modified from https://gist.github.com/JohannesMP/afdf27383608c3b6f20a6a072d0be93c?permalink_comment_id=4784940#gistcomment-4784940
 			let wpRequire;
 			webpackChunkdiscord_app.push([
 				[Math.random()],
@@ -792,15 +936,15 @@ module.exports = class BDNitro {
 			//Logger.error(this.meta.name, err);
 		}
 	}
+	// #endregion
 
+	// #region Client Themes
 	clientThemes() {
-		if (this.clientThemesModule == undefined) this.clientThemesModule = Webpack.getModule(Webpack.Filters.byProps('isPreview'));
-
 		//delete isPreview property so that we can set our own
-		delete this.clientThemesModule.isPreview;
+		delete clientThemesModule.isPreview;
 
 		//this property basically unlocks the client theme buttons
-		Object.defineProperty(this.clientThemesModule, 'isPreview', {
+		Object.defineProperty(clientThemesModule, 'isPreview', {
 			//Enabling the nitro theme settings
 			value: false,
 			configurable: true,
@@ -808,14 +952,8 @@ module.exports = class BDNitro {
 			writable: true
 		});
 
-		if (this.themesModule == undefined) this.themesModule = Webpack.getByKeys('V1', 'ZI');
-
-		if (this.gradientSettingModule == undefined) this.gradientSettingModule = Webpack.getByKeys('kj', 'zO');
-		const resetPreviewClientTheme = this.gradientSettingModule.kj;
-		const updateBackgroundGradientPreset = this.gradientSettingModule.zO;
-
 		//Patching saveClientTheme function.
-		Patcher.instead(this.meta.name, this.themesModule, 'ZI', (_, [args]) => {
+		Patcher.instead(this.meta.name, themesModule, 'saveClientTheme', (_, [args]) => {
 			if (args.backgroundGradientPresetId == undefined) {
 				//If this number is -1, that indicates to the plugin that the current theme we're setting to is not a gradient nitro theme.
 				settings.lastGradientSettingStore = -1;
@@ -864,8 +1002,8 @@ module.exports = class BDNitro {
 				//gradient themes
 				//Store the last gradient setting used in settings
 				settings.lastGradientSettingStore = args.backgroundGradientPresetId;
+
 				//save any changes to settings
-				//Utilities.saveSettings(this.meta.name, this.settings);
 				Data.save(this.meta.name, 'settings', this.settings);
 
 				//dispatch settings update event to change to the gradient the user chose
@@ -886,34 +1024,41 @@ module.exports = class BDNitro {
 				});
 
 				//update background gradient preset to the one that was just chosen.
-				updateBackgroundGradientPreset(settings.lastGradientSettingStore);
+				Dispatcher.dispatch({
+					type: 'UPDATE_BACKGROUND_GRADIENT_PRESET',
+					presetId: settings.lastGradientSettingStore
+				});
 			}
 		}); //End of saveClientTheme patch.
 
 		//If last appearance choice was a nitro client theme
 		if (settings.lastGradientSettingStore != -1) {
-			//This line sets the gradient on plugin save and load.
-			updateBackgroundGradientPreset(settings.lastGradientSettingStore);
+			//This sets the gradient on plugin save and load.
+			Dispatcher.dispatch({
+				type: 'UPDATE_BACKGROUND_GRADIENT_PRESET',
+				presetId: settings.lastGradientSettingStore
+			});
 		}
 
-		if (this.accountSwitchModule == undefined) this.accountSwitchModule = Webpack.getByKeys('startSession', 'login');
-
 		//startSession patch. This function runs upon switching accounts.
-		Patcher.after(this.meta.name, this.accountSwitchModule, 'startSession', () => {
-			//If last appearance choice was a nitro client theme
+		Patcher.after(this.meta.name, accountSwitchModule, 'startSession', () => {
 			setTimeout(() => {
+				//If last appearance choice was a nitro client theme
 				if (settings.lastGradientSettingStore != -1) {
 					//Restore gradient on account switch
-					updateBackgroundGradientPreset(settings.lastGradientSettingStore);
+					Dispatcher.dispatch({
+						type: 'UPDATE_BACKGROUND_GRADIENT_PRESET',
+						presetId: settings.lastGradientSettingStore
+					});
 				}
 			}, 3000);
 		});
 	} //End of clientThemes()
+	// #endregion
 
+	// #region Custom PFP Decode
 	customProfilePictureDecoding() {
-		if (this.getAvatarUrlModule == undefined) this.getAvatarUrlModule = Webpack.getByPrototypeKeys('getAvatarURL').prototype;
-
-		Patcher.instead(this.meta.name, this.getAvatarUrlModule, 'getAvatarURL', (user, [userId, size, shouldAnimate], originalFunction) => {
+		Patcher.instead(this.meta.name, getAvatarUrlModule, 'getAvatarURL', (user, [userId, size, shouldAnimate], originalFunction) => {
 			//userpfp closer integration
 			//if we haven't fetched userPFP database yet and it's enabled
 			if ((!fetchedUserPfp || this.userPfps == undefined) && settings.userPfpIntegration) {
@@ -982,16 +1127,15 @@ module.exports = class BDNitro {
 			return originalFunction(userId, size, shouldAnimate);
 		});
 	}
+	// #endregion
 
+	// #region Custom PFP Encode
 	//Custom PFP profile customization buttons and encoding code.
 	async customProfilePictureEncoding(secondsightifyEncodeOnly) {
 		//wait for avatar customization section renderer to be loaded
 		await Webpack.waitForModule(Webpack.Filters.byStrings('showRemoveAvatarButton', 'isTryItOutFlow'));
 		//store avatar customization section renderer module
-		if (this.customPFPSettingsRenderMod == undefined)
-			this.customPFPSettingsRenderMod = Webpack.getAllByKeys('Z')
-				.filter((obj) => obj.Z.toString().includes('showRemoveAvatarButton'))
-				.filter((obj) => obj.Z.toString().includes('isTryItOutFlow'))[0];
+		if (this.customPFPSettingsRenderMod == undefined) this.customPFPSettingsRenderMod = Webpack.getByStrings('showRemoveAvatarButton', 'isTryItOutFlow', { defaultExport: false });
 
 		Patcher.after(this.meta.name, this.customPFPSettingsRenderMod, 'Z', (_, [args], ret) => {
 			//don't need to do anything if this is the "Try out Nitro" flow.
@@ -1007,7 +1151,7 @@ module.exports = class BDNitro {
 						marginTop: '5px',
 						marginLeft: '5px'
 					},
-					placeholder: 'Imgur URL'
+					placeholder: 'Imgur URL for PFP'
 				})
 			);
 
@@ -1115,11 +1259,12 @@ module.exports = class BDNitro {
 			); //end of element push
 		}); //end of patch
 	} //End of customProfilePictureEncoding()
+	// #endregion
 
 	// Aplicar badges customizados
 	LoadingBadges() {
 		// Uso de la insignia de usuario de BDNitro
-		BdApi.DOM.addStyle(
+		DOM.addStyle(
 			'BDNitroBadges',
 			`
         a[aria-label="¡Un compañero usuario de BDNitro!"] img {
@@ -1268,7 +1413,9 @@ module.exports = class BDNitro {
 			});
 		}); // Fin del parche de getUserProfile
 	} // Fin de LoadingBadges()
+	// #endregion
 
+	// #region 3y3 Secondsightify
 	secondsightifyRevealOnly(t) {
 		if ([...t].some((x) => 0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f)) {
 			// 3y3 text detected. Revealing...
@@ -1288,7 +1435,9 @@ module.exports = class BDNitro {
 			return ((t) => [...t].map((x) => (0x00 < x.codePointAt(0) && x.codePointAt(0) < 0x7f ? String.fromCodePoint(x.codePointAt(0) + 0xe0000) : x)).join(''))(t);
 		}
 	}
+	// #endregion
 
+	// #region Profile Effects
 	//Everything related to Fake Profile Effects.
 	async profileFX(secondsightifyEncodeOnly) {
 		if (settings.killProfileEffects) return; //profileFX is mutually exclusive with killProfileEffects (obviously)
@@ -1296,18 +1445,12 @@ module.exports = class BDNitro {
 		//wait for profile effects module
 		await Webpack.waitForModule(Webpack.Filters.byProps('profileEffects', 'tryItOutId'));
 
-		//try to get profile effects data
 		if (this.profileEffects == undefined) this.profileEffects = Webpack.getStore('ProfileEffectStore').profileEffects;
-		if (this.fetchProfileEffects == undefined) this.fetchProfileEffects = Webpack.getAllByKeys('z').filter((obj) => obj.z.toString().includes('USER_PROFILE_EFFECTS_FETCH'))[0].z;
 
 		//if profile effects data hasn't been fetched by the client yet
-		if (this.profileEffects == undefined) {
+		if (this.profileEffects == undefined || this.profileEffects?.length === 0) {
 			//make the client fetch profile effects
-			await this.fetchProfileEffects('Failed to fetch profile effects.');
-			//then wait for the effects to be fetched and store them
-			this.profileEffects = Webpack.getStore('ProfileEffectStore').profileEffects;
-		} else if (this.profileEffects.length == 0) {
-			await this.fetchProfileEffects('Failed to fetch profile effects.');
+			await fetchProfileEffects();
 			this.profileEffects = Webpack.getStore('ProfileEffectStore').profileEffects;
 		}
 
@@ -1353,7 +1496,7 @@ module.exports = class BDNitro {
 		await Webpack.waitForModule(Webpack.Filters.byStrings('initialSelectedEffectId'));
 
 		//fetch the module now that it's loaded
-		if (this.profileEffectSectionRenderer == undefined) this.profileEffectSectionRenderer = Webpack.getAllByKeys('Z').filter((obj) => obj.Z.toString().includes('initialSelectedEffectId'))[0];
+		if (this.profileEffectSectionRenderer == undefined) this.profileEffectSectionRenderer = Webpack.getByStrings('initialSelectedEffectId', { defaultExport: false });
 
 		//patch profile effect section renderer function to run the following code after the function runs
 		Patcher.after(this.meta.name, this.profileEffectSectionRenderer, 'Z', (_, [args], ret) => {
@@ -1384,7 +1527,7 @@ module.exports = class BDNitro {
 
 				profileEffectChildren.push(
 					React.createElement('img', {
-						className: 'srgobiSecretStuff',
+						className: 'riolubruhsSecretStuff',
 						onClick: copyDecoration3y3,
 						src: previewURL,
 						title,
@@ -1443,17 +1586,16 @@ module.exports = class BDNitro {
 	} //End of profileFX()
 
 	killProfileFX() {
-		//self explanatory
+		//self explanatory, just tries to make it so any profile that has a profile effect appears without it
 		Patcher.after(this.meta.name, userProfileMod, 'getUserProfile', (_, args, ret) => {
-			if (ret == undefined) return;
-			if (ret.profileEffectID == undefined) return;
-			//self explanatory
+			if (ret?.profileEffectID === undefined) return;
 			ret.profileEffectID = undefined;
 		});
 	}
+	// #endregion
 
+	// #region Avatar Decorations
 	//Everything related to fake avatar decorations.
-
 	storeProductsFromCategories = (event) => {
 		if (event.categories) {
 			event.categories.forEach((category) => {
@@ -1538,7 +1680,7 @@ module.exports = class BDNitro {
 					sku_id: '1144003461608906824' //dummy sku id
 				};
 
-				//add user to the list of users to show with the YABDP4Nitro user badge if we haven't already.
+				//add user to the list of users to show with the BDNitro user badge if we haven't already.
 				if (!badgeUserIDs.includes(ret.id)) badgeUserIDs.push(ret.id);
 			}
 		}); //end of getUser patch for avatar decorations
@@ -1558,7 +1700,7 @@ module.exports = class BDNitro {
 		await Webpack.waitForModule(Webpack.Filters.byStrings('userAvatarDecoration'));
 
 		//Avatar decoration customization section render module/function.
-		if (!this.decorationCustomizationSectionMod) this.decorationCustomizationSectionMod = Webpack.getAllByKeys('Z').filter((obj) => obj.Z.toString().includes('userAvatarDecoration'))[0];
+		if (!this.decorationCustomizationSectionMod) this.decorationCustomizationSectionMod = Webpack.getByStrings('userAvatarDecoration', { defaultExport: false });
 
 		//Avatar decoration customization section patch
 		Patcher.after(this.meta.name, this.decorationCustomizationSectionMod, 'Z', (_, [args], ret) => {
@@ -1569,7 +1711,7 @@ module.exports = class BDNitro {
 			ret.props.children[0].props.children.push(
 				React.createElement('button', {
 					id: 'decorationButton',
-					children: 'Change Decoration [YABDP4Nitro]',
+					children: 'Change Decoration [BDNitro]',
 					style: {
 						width: '100px',
 						height: '50px',
@@ -1579,7 +1721,7 @@ module.exports = class BDNitro {
 					},
 					className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
 					onClick: () => {
-						UI.showConfirmationModal('Change Avatar Decoration (YABDP4Nitro)', React.createElement(DecorModal));
+						UI.showConfirmationModal('Change Avatar Decoration (BDNitro)', React.createElement(DecorModal));
 					}
 				})
 			);
@@ -1639,7 +1781,9 @@ module.exports = class BDNitro {
 			}
 		}); //end patch of profile decoration section renderer function
 	} //End of fakeAvatarDecorations()
+	// #endregion
 
+	//#region Emote Uploader
 	async UploadEmote(url, channelIdLmao, msg, emoji, runs) {
 		if (emoji === undefined) {
 			let emoji;
@@ -1691,6 +1835,73 @@ module.exports = class BDNitro {
 			Logger.error(this.meta.name, err);
 		}
 	}
+	// #endregion
+
+	//#region Soundmoji Uploader
+	async UploadSoundmojis(ids, channelId, msg, sounds) {
+		if (ids != undefined && channelId != undefined && msg != undefined) {
+			let files = [];
+			for (let i = 0; i < ids.length; i++) {
+				let file = await fetch('https://cdn.discordapp.com/soundboard-sounds/' + ids[i])
+					.then((res) => res.blob())
+					.then((blobFile) => new File([blobFile], `${sounds[i].name}.mp3`));
+				file.platform = 1;
+				file.spoiler = false;
+				let fileUp = new CloudUploader({ file: file, isClip: false, isThumbnail: false, platform: 1 }, channelId, false, 0);
+				files.push(fileUp);
+				fileUp.isAudio = true;
+			}
+			let uploadOptions = new Object();
+			uploadOptions.channelId = channelId;
+			uploadOptions.draftType = 0;
+			uploadOptions.options = {
+				stickerIds: []
+			};
+			if (files.length <= 10) {
+				uploadOptions.uploads = files;
+				uploadOptions.parsedMessage = { channelId, content: msg.content, tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
+				try {
+					await Uploader.uploadFiles(uploadOptions); //finally finish the process of uploading
+				} catch (err) {
+					Logger.error(this.meta.name, err);
+				}
+			} else {
+				//Upload 10 files at a time with a delay
+				let firstTime = true;
+				while (files.length) {
+					let tenFiles = files.splice(0, 10);
+					uploadOptions.uploads = tenFiles;
+					if (firstTime) uploadOptions.parsedMessage = { channelId, content: msg.content, tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
+					else uploadOptions.parsedMessage = { channelId, content: '', tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
+					try {
+						await Uploader.uploadFiles(uploadOptions); //finally finish the process of uploading
+					} catch (err) {
+						Logger.error(this.meta.name, err);
+					}
+					firstTime = false;
+					await new Promise((r) => setTimeout(r, 3000));
+				}
+			}
+		}
+	}
+	// #endregion
+
+	customVideoSettings() {
+		//If you're trying to figure this shit out yourself, I recommend uncommenting the line below.
+		//console.log(StreamButtons);
+
+		//Nice try, Discord.
+		Patcher.instead(this.meta.name, StreamButtons, 'getApplicationFramerate', (_, [args]) => {
+			return args;
+		});
+		Patcher.instead(this.meta.name, StreamButtons, 'getApplicationResolution', (_, [args]) => {
+			return args;
+		});
+
+		this.unlockAndCustomizeStreamButtons();
+	} //End of customVideoSettings()
+
+	// #region Emoji Bypass-related
 
 	//Whether we should skip the emoji bypass for a given emoji.
 	// true = skip bypass
@@ -1711,124 +1922,17 @@ module.exports = class BDNitro {
 		return false;
 	}
 
-	customVideoSettings() {
-		//Unlock stream buttons, apply custom resolution and fps, and apply stream quality bypasses
-		//If you're trying to figure this shit out yourself, I recommend uncommenting the line below.
-		//console.log(StreamButtons);
+	_sendMessageInsteadPatch() {
+		this.experiments();
+		this.overrideExperiment('2024-11_soundmoji_sending', 2);
 
-		//Nice try, Discord.
-		Patcher.instead(this.meta.name, StreamButtons, 'L9', (_, [args]) => {
-			//getApplicationFramerate
-			return args;
-		});
-		Patcher.instead(this.meta.name, StreamButtons, 'aW', (_, [args]) => {
-			//getApplicationResolution
-			return args;
-		});
-
-		//If custom resolution is enabled and the resolution is not set to 0,
-		if (settings.ResolutionEnabled && settings.CustomResolution != 0) {
-			//some of these properties are marked as read only, but they still allow you to delete them
-			//so any time you see "delete", what we're doing is bypassing the read-only thing by deleting it and immediately remaking it.
-			delete ApplicationStreamResolutions.RESOLUTION_1440;
-			//Change 1440p resolution internally to custom resolution
-			ApplicationStreamResolutions.RESOLUTION_1440 = settings.CustomResolution;
-
-			//********************************** Requirements below this point*************************************
-			ApplicationStreamSettingRequirements[4].resolution = settings.CustomResolution;
-			ApplicationStreamSettingRequirements[5].resolution = settings.CustomResolution;
-			ApplicationStreamSettingRequirements[6].resolution = settings.CustomResolution;
-
-			//************************************Buttons below this point*****************************************
-			//Set resolution button value to custom resolution
-			ApplicationStreamResolutionButtons[2].value = settings.CustomResolution;
-			delete ApplicationStreamResolutionButtons[2].label;
-			//Set label of resolution button to custom resolution. This one is used in the popup window that appears before you start streaming.
-			ApplicationStreamResolutionButtons[2].label = settings.CustomResolution.toString();
-
-			//Set value of button with suffix label to custom resolution
-			ApplicationStreamResolutionButtonsWithSuffixLabel[3].value = settings.CustomResolution;
-			delete ApplicationStreamResolutionButtonsWithSuffixLabel[3].label;
-			//Set label of button with suffix label to custom resolution with "p" after it, ex: "1440p"
-			//This one is used in the dropdown kind of menu after you've started streaming
-			ApplicationStreamResolutionButtonsWithSuffixLabel[3].label = settings.CustomResolution + 'p';
-		}
-
-		//If custom resolution tick is disabled or custom resolution is set to 0,
-		if (!settings.ResolutionEnabled || settings.CustomResolution == 0) {
-			//Reset all values to defaults.
-			delete ApplicationStreamResolutions.RESOLUTION_1440;
-			ApplicationStreamResolutions.RESOLUTION_1440 = 1440;
-			ApplicationStreamSettingRequirements[4].resolution = 1440;
-			ApplicationStreamSettingRequirements[5].resolution = 1440;
-			ApplicationStreamSettingRequirements[6].resolution = 1440;
-			ApplicationStreamResolutionButtons[2].value = 1440;
-			delete ApplicationStreamResolutionButtons[2].label;
-			ApplicationStreamResolutionButtons[2].label = '1440';
-			ApplicationStreamResolutionButtonsWithSuffixLabel[3].value = 1440;
-			delete ApplicationStreamResolutionButtonsWithSuffixLabel[3].label;
-			ApplicationStreamResolutionButtonsWithSuffixLabel[3].label = '1440p';
-		}
-
-		//Removes stream setting requirements
-		function removeQualityParameters(x) {
-			try {
-				delete x.quality;
-			} catch (err) {}
-			try {
-				delete x.guildPremiumTier;
-			} catch (err) {}
-		}
-
-		/*Remove each of the stream setting requirements 
-        (which basically just tell your client what premiumType / guildPremiumTier you need to access that resolution)
-        removing the setting requirements makes it default to thinking that every premiumType can use it.*/
-		ApplicationStreamSettingRequirements.forEach(removeQualityParameters);
-		function replace60FPSRequirements(x) {
-			if (x.fps != 30 && x.fps != 15 && x.fps != 5) x.fps = BdApi.getData('BDNitro', 'settings').CustomFPS;
-		}
-		function restore60FPSRequirements(x) {
-			if (x.fps != 30 && x.fps != 15 && x.fps != 5) x.fps = 60;
-		}
-
-		//If Custom FPS is enabled and does not equal 60,
-		if (settings.CustomFPSEnabled && this.CustomFPS != 60) {
-			//remove FPS nitro requirements
-			ApplicationStreamSettingRequirements.forEach(replace60FPSRequirements);
-			//set suffix label button value to the custom number
-			ApplicationStreamFPSButtonsWithSuffixLabel[2].value = settings.CustomFPS;
-			delete ApplicationStreamFPSButtonsWithSuffixLabel[2].label;
-			//set button suffix label with the correct number with " FPS" after it. ex: "75 FPS". This one is used in the dropdown kind of menu
-			ApplicationStreamFPSButtonsWithSuffixLabel[2].label = settings.CustomFPS + ' FPS';
-			//set fps button value to the correct number.
-			ApplicationStreamFPSButtons[2].value = settings.CustomFPS;
-			delete ApplicationStreamFPSButtons[2].label;
-			//set fps button label to the correct number. This one is used in the popup window that appears before you start streaming.
-			ApplicationStreamFPSButtons[2].label = settings.CustomFPS;
-			ApplicationStreamFPS.FPS_60 = settings.CustomFPS;
-		}
-
-		//If custom FPS toggle is disabled, or custom fps is set to the default of 60,
-		if (!settings.CustomFPSEnabled || this.CustomFPS == 60) {
-			//Reset all values to defaults.
-			ApplicationStreamSettingRequirements.forEach(restore60FPSRequirements);
-			ApplicationStreamFPSButtonsWithSuffixLabel[2].value = 60;
-			delete ApplicationStreamFPSButtonsWithSuffixLabel[2].label;
-			ApplicationStreamFPSButtonsWithSuffixLabel[2].label = '60 FPS';
-			ApplicationStreamFPSButtons[2].value = 60;
-			delete ApplicationStreamFPSButtons[2].label;
-			ApplicationStreamFPSButtons[2].label = 60;
-			ApplicationStreamFPS.FPS_60 = 60;
-		}
-	} //End of customVideoSettings()
-
-	emojiBypass() {
-		//Upload Emotes Method
-		if (settings.emojiBypassType == 0) {
-			Patcher.instead(this.meta.name, MessageActions, '_sendMessage', (_, msg, send) => {
+		Patcher.instead(this.meta.name, MessageActions, '_sendMessage', (_, msg, send) => {
+			let doDefaultSend = false;
+			//#region Upload Emoji
+			function uploadEmoteMethod(msg, send, self) {
 				if (msg[2].poll != undefined || msg[2].activityAction != undefined || msg[2].messageReference) {
 					//fix polls, activity actions, forwarding
-					send(msg[0], msg[1], msg[2], msg[3]);
+					doDefaultSend = true;
 					return;
 				}
 
@@ -1837,17 +1941,15 @@ module.exports = class BDNitro {
 					let SDC_Tooltip = document.getElementsByClassName('sdc-tooltip')[0];
 					if (SDC_Tooltip.innerHTML == 'Disable Encryption') {
 						//SDC Encryption Enabled
-						send(msg[0], msg[1], msg[2], msg[3]);
+						doDefaultSend = true;
 						return;
 					}
 				}
 
-				console.log(msg);
-
 				const currentChannelId = msg[0];
 				let runs = 0; //number of times the uploader has run for this message
 				msg[1].validNonShortcutEmojis.forEach((emoji) => {
-					if (this.emojiBypassForValidEmoji(emoji, currentChannelId)) return; //Unlocked emoji. Skip.
+					if (self.emojiBypassForValidEmoji(emoji, currentChannelId)) return; //Unlocked emoji. Skip.
 					if (emoji.type == 'UNICODE') return; //If this "emoji" is actually a unicode character, it doesn't count. Skip bypassing if so.
 					if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
 					if (settings.PNGemote) {
@@ -1873,13 +1975,88 @@ module.exports = class BDNitro {
 					//remove emote from message.
 					msg[1].content = msg[1].content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, '');
 					//upload emote
-					this.UploadEmote(emojiUrl, currentChannelId, msg, emoji, runs);
+					self.UploadEmote(emojiUrl, currentChannelId, msg, emoji, runs);
 				});
 				if (msg[1].content !== undefined && (msg[1].content != '' || msg[2].activityAction != undefined) && runs == 0) {
-					send(msg[0], msg[1], msg[2], msg[3]);
+					doDefaultSend = true;
 				}
-			});
+			}
 
+			if (settings.emojiBypass && settings.emojiBypassType == 0) {
+				uploadEmoteMethod(msg, send, this);
+			}
+			//#endregion
+
+			//#region Upload Soundmoji
+
+			function uploadSoundmojiMethod(msg, send, self) {
+				const channelId = msg[0];
+				let regex = /<sound:[0-9]\d+:[0-9]\d+>/g;
+				let soundmojis = msg[1].content.match(regex);
+				if (soundmojis) {
+					let ids = [];
+					let sounds = [];
+					for (let i = 0; i < soundmojis.length; i++) {
+						let id = soundmojis[i].slice(-20, -1);
+						let sound = getSoundMod.getSoundById(id);
+						if (sound) {
+							sounds.push(sound);
+							ids.push(id);
+							let soundCode = self.secondsightifyEncodeOnly(`/snd${id}`);
+							if (sound?.emojiId == null && sound?.emojiName != null) {
+								//default / system emoji
+								msg[1].content = msg[1].content.replace(soundmojis[i], `${soundCode}( ${sound.emojiName} ${sound.name} )`);
+							} else if (sound?.emojiId != null) {
+								// custom emoji
+								let emoji = emojiMod.getCustomEmojiById(sound.emojiId);
+								msg[1].content = msg[1].content.replace(soundmojis[i], `( [${emoji?.name ? emoji.name : 'someCustomEmoji'}](https://cdn.discordapp.com/emojis/${sound.emojiId}.${emoji?.animated ? 'gif' : 'png'}) ${sound.name} ) `);
+							} else {
+								//no emoji
+								msg[1].content = msg[1].content.replace(soundmojis[i], `( ${sound.name} ) `);
+							}
+						} else continue;
+					}
+					if (ids.length > 0) {
+						self.UploadSoundmojis(ids, channelId, msg[1], sounds);
+						doDefaultSend = false;
+					} else {
+						doDefaultSend = true;
+					}
+				} else {
+					// no soundmojis
+					doDefaultSend = true;
+				}
+			}
+
+			if (settings.soundmojiEnabled) {
+				uploadSoundmojiMethod(msg, send, this);
+			}
+
+			if (doDefaultSend) send(msg[0], msg[1], msg[2], msg[3]);
+			//#endregion
+		});
+	}
+
+	emojiBypass() {
+		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'isEmojiFilteredOrLocked', () => {
+			return false;
+		});
+		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'isEmojiDisabled', () => {
+			return false;
+		});
+		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'isEmojiFiltered', () => {
+			return false;
+		});
+		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'isEmojiPremiumLocked', () => {
+			return false;
+		});
+		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'getEmojiUnavailableReason', () => {
+			return;
+		});
+
+		//Upload Emotes Method
+		if (settings.emojiBypassType == 0) {
+			//#region Upload Emoji Patch
 			Patcher.instead(this.meta.name, Uploader, 'uploadFiles', (_, [args], originalFunction) => {
 				if (document.getElementsByClassName('sdc-tooltip').length > 0) {
 					let SDC_Tooltip = document.getElementsByClassName('sdc-tooltip')[0];
@@ -1926,7 +2103,7 @@ module.exports = class BDNitro {
 						//send file with text and shit
 						originalFunction(args);
 
-						//loop through emotes to send one at a time
+						//loop through emotes to send one at a time. this has technically no delay so it may trigger anti-spam.
 						for (let i = 0; i < emojis.length; i++) {
 							let emoji = emojis[i];
 							let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
@@ -1946,8 +2123,10 @@ module.exports = class BDNitro {
 					originalFunction(args);
 				}
 			});
+			//#endregion
 		}
 
+		//#region Ghost Mode Patch
 		//Ghost mode method
 		const ghostmodetext =
 			'||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​|| _ _ _ _ _ ';
@@ -2010,7 +2189,9 @@ module.exports = class BDNitro {
 				ghostModeMethod(msg, currentChannelId, this);
 			});
 		}
+		//#endregion
 
+		//#region Classic Mode Patch
 		//Original method
 		if (settings.emojiBypassType == 2) {
 			function classicModeMethod(msg, currentChannelId, self) {
@@ -2065,7 +2246,9 @@ module.exports = class BDNitro {
 				});
 			});
 		}
+		//#endregion
 
+		//#region Vencord-like Patch
 		//Vencord-like bypass
 		if (settings.emojiBypassType == 3) {
 			function vencordModeMethod(msg, currentChannelId, self) {
@@ -2110,12 +2293,38 @@ module.exports = class BDNitro {
 				vencordModeMethod(msg, currentChannelId, this);
 			});
 		}
+		//#endregion
 	} //End of emojiBypass()
 
+	soundmojiMessageRenderPatch() {
+		const inlineSoundmoji = Webpack.getByStrings('SoundboardMentionInline', { searchExports: true });
+		Patcher.before(this.meta.name, messageRender.renderMessage, 'type', (_, [args]) => {
+			for (let i = 0; i < args.content.length; i++) {
+				let curContentObj = args.content[i];
+				if (typeof curContentObj.props?.children === 'string') {
+					let revealed = this.secondsightifyRevealOnly(args.content[i].props?.children);
+					if (revealed?.includes('/snd')) {
+						let matches = revealed.match(/\/snd\d+/);
+						if (matches) {
+							let match = matches[0];
+							let id = match.replace('/snd', '');
+							args.content[i + 1] = React.createElement(inlineSoundmoji, {
+								channelId: args.message.channel_id,
+								messageId: args.message.id,
+								soundId: id,
+								jumbo: false
+							});
+						}
+					}
+				}
+			}
+		});
+	}
+
+	//#region Fake Inline Emoji
 	inlineFakemojiPatch() {
 		//Somehow, this is the first time I've had to actually patch message rendering. (and it shows!)
-		Patcher.before(this.meta.name, messageRender.ZP, 'type', (_, [args]) => {
-			//console.log(args);
+		Patcher.before(this.meta.name, messageRender.renderMessage, 'type', (_, [args]) => {
 			for (let i = 0; i < args.content.length; i++) {
 				let contentItem = args.content[i];
 
@@ -2131,7 +2340,7 @@ module.exports = class BDNitro {
 						let key = contentItem.key; //store key
 
 						//create discord emoji react element
-						let emoteElement = BdApi.React.createElement(MessageEmojiReact, {
+						let emoteElement = React.createElement(MessageEmojiReact, {
 							node: {
 								name: `:${emojiName}:`,
 								src: contentItem.props.href.split('?')[0] + '?size=48',
@@ -2215,83 +2424,96 @@ module.exports = class BDNitro {
 				return [];
 			}
 		});
+		//#endregion
 	}
+	//#endregion
 
-	updateQuick() {
-		//Function that runs when the resolution/fps quick menu is changed.
-		//Refer to customVideoSettings function for comments on what this all does, since this code is just a copy-paste from there.
-		const settings = BdApi.getData('DBNitro', 'settings');
-		parseInt(document.getElementById('qualityInput').value);
-		settings.CustomResolution = parseInt(document.getElementById('qualityInput').value);
-		parseInt(document.getElementById('qualityInputFPS').value);
-		settings.CustomFPS = parseInt(document.getElementById('qualityInputFPS').value);
-		if (parseInt(document.getElementById('qualityInputFPS').value) == 15) settings.CustomFPS = 16;
-		if (parseInt(document.getElementById('qualityInputFPS').value) == 30) settings.CustomFPS = 31;
-		if (parseInt(document.getElementById('qualityInputFPS').value) == 5) settings.CustomFPS = 6;
+	//#region Streaming Unlock
+	unlockAndCustomizeStreamButtons() {
+		//Unlock stream buttons, apply custom resolution and fps, and apply stream quality bypasses
 
-		if (settings.ResolutionEnabled && settings.CustomResolution != 0) {
-			delete ApplicationStreamResolutions.RESOLUTION_1440;
-			ApplicationStreamResolutions.RESOLUTION_1440 = settings.CustomResolution;
-			ApplicationStreamSettingRequirements[4].resolution = settings.CustomResolution;
-			ApplicationStreamSettingRequirements[5].resolution = settings.CustomResolution;
-			ApplicationStreamSettingRequirements[6].resolution = settings.CustomResolution;
-			ApplicationStreamResolutionButtons[2].value = settings.CustomResolution;
-			delete ApplicationStreamResolutionButtons[2].label;
-			ApplicationStreamResolutionButtons[2].label = settings.CustomResolution.toString();
-			ApplicationStreamResolutionButtonsWithSuffixLabel[3].value = settings.CustomResolution;
-			delete ApplicationStreamResolutionButtonsWithSuffixLabel[3].label;
-			ApplicationStreamResolutionButtonsWithSuffixLabel[3].label = settings.CustomResolution + 'p';
+		const settings = BdApi.getData('BDNitro', 'settings'); //just in case we can't access "this";
+
+		//If custom resolution tick is disabled or custom resolution is set to 0, set it to 1440
+		let resolutionToSet = parseInt(settings.CustomResolution);
+		if (!settings.ResolutionEnabled || settings.CustomResolution == 0) resolutionToSet = 1440;
+
+		//Some of these properties are marked as read only, but they still allow you to delete them
+		//So any time you see "delete", what we're doing is bypassing the read-only lock by deleting it and remaking it.
+
+		//Set resolution buttons and requirements
+
+		delete ApplicationStreamResolutions.RESOLUTION_1440;
+		//Change 1440p resolution internally to custom resolution
+		ApplicationStreamResolutions.RESOLUTION_1440 = resolutionToSet;
+
+		//********************************** Requirements below this point*************************************
+		ApplicationStreamSettingRequirements[4].resolution = resolutionToSet;
+		ApplicationStreamSettingRequirements[5].resolution = resolutionToSet;
+		ApplicationStreamSettingRequirements[6].resolution = resolutionToSet;
+
+		//************************************Buttons below this point*****************************************
+		//Set resolution button value to custom resolution
+		ApplicationStreamResolutionButtons[2].value = resolutionToSet;
+		delete ApplicationStreamResolutionButtons[2].label;
+		//Set label of resolution button to custom resolution. This one is used in the popup window that appears before you start streaming.
+		ApplicationStreamResolutionButtons[2].label = resolutionToSet.toString();
+
+		//Set value of button with suffix label to custom resolution
+		ApplicationStreamResolutionButtonsWithSuffixLabel[3].value = resolutionToSet;
+		delete ApplicationStreamResolutionButtonsWithSuffixLabel[3].label;
+		//Set label of button with suffix label to custom resolution with "p" after it, ex: "1440p"
+		//This one is used in the dropdown kind of menu after you've started streaming
+		ApplicationStreamResolutionButtonsWithSuffixLabel[3].label = resolutionToSet + 'p';
+
+		//Removes stream setting requirements
+		function removeQualityParameters(x) {
+			try {
+				delete x.quality;
+			} catch (err) {}
+			try {
+				delete x.guildPremiumTier;
+			} catch (err) {}
 		}
-		if (!settings.ResolutionEnabled || settings.CustomResolution == 0) {
-			delete ApplicationStreamResolutions.RESOLUTION_1440;
-			ApplicationStreamResolutions.RESOLUTION_1440 = 1440;
-			ApplicationStreamSettingRequirements[4].resolution = 1440;
-			ApplicationStreamSettingRequirements[5].resolution = 1440;
-			ApplicationStreamSettingRequirements[6].resolution = 1440;
-			ApplicationStreamResolutionButtons[2].value = 1440;
-			delete ApplicationStreamResolutionButtons[2].label;
-			ApplicationStreamResolutionButtons[2].label = '1440';
-			ApplicationStreamResolutionButtonsWithSuffixLabel[3].value = 1440;
-			delete ApplicationStreamResolutionButtonsWithSuffixLabel[3].label;
-			ApplicationStreamResolutionButtonsWithSuffixLabel[3].label = '1440p';
-		}
+
+		/*Remove each of the stream setting requirements 
+        which normally tell the client what premiumType / guildPremiumTier you need to access that resolution.
+        Removing the setting requirements makes it default to thinking that every premiumType can use it.*/
+		ApplicationStreamSettingRequirements.forEach(removeQualityParameters);
+
 		function replace60FPSRequirements(x) {
-			if (x.fps != 30 && x.fps != 15 && x.fps != 5) x.fps = BdApi.getData('DBNitro', 'settings').CustomFPS;
-		}
-		function restore60FPSRequirements(x) {
-			if (x.fps != 30 && x.fps != 15 && x.fps != 5) x.fps = 60;
+			if (x.fps != 30 && x.fps != 15 && x.fps != 5) x.fps = fpsToSet;
 		}
 
-		if (settings.CustomFPSEnabled) {
-			if (this.CustomFPS != 60) {
-				ApplicationStreamSettingRequirements.forEach(replace60FPSRequirements);
-				ApplicationStreamFPSButtonsWithSuffixLabel[2].value = settings.CustomFPS;
-				delete ApplicationStreamFPSButtonsWithSuffixLabel[2].label;
-				ApplicationStreamFPSButtonsWithSuffixLabel[2].label = settings.CustomFPS + ' FPS';
-				ApplicationStreamFPSButtons[2].value = settings.CustomFPS;
-				delete ApplicationStreamFPSButtons[2].label;
-				ApplicationStreamFPSButtons[2].label = settings.CustomFPS;
-				ApplicationStreamFPS.FPS_60 = settings.CustomFPS;
-			}
-		}
-		if (!settings.CustomFPSEnabled || this.CustomFPS == 60) {
-			ApplicationStreamSettingRequirements.forEach(restore60FPSRequirements);
-			ApplicationStreamFPSButtonsWithSuffixLabel[2].value = 60;
-			delete ApplicationStreamFPSButtonsWithSuffixLabel[2].label;
-			ApplicationStreamFPSButtonsWithSuffixLabel[2].label = 60 + ' FPS';
-			ApplicationStreamFPSButtons[2].value = 60;
-			delete ApplicationStreamFPSButtons[2].label;
-			ApplicationStreamFPSButtons[2].label = 60;
-			ApplicationStreamFPS.FPS_60 = 60;
-		}
-		Data.save('DBNitro', 'settings', settings);
-	} //End of updateQuick()
+		let fpsToSet = parseInt(settings.CustomFPS);
+		//If custom FPS toggle is disabled, set to the default 60.
+		if (!settings.CustomFPSEnabled) fpsToSet = 60;
 
+		//Set FPS buttons and requirements
+
+		//remove FPS nitro requirements
+		ApplicationStreamSettingRequirements.forEach(replace60FPSRequirements);
+		//set suffix label button value to the custom number
+		ApplicationStreamFPSButtonsWithSuffixLabel[2].value = fpsToSet;
+		delete ApplicationStreamFPSButtonsWithSuffixLabel[2].label;
+		//set button suffix label with the correct number with " FPS" after it. ex: "75 FPS". This one is used in the dropdown kind of menu
+		ApplicationStreamFPSButtonsWithSuffixLabel[2].label = fpsToSet + ' FPS';
+		//set fps button value to the correct number.
+		ApplicationStreamFPSButtons[2].value = fpsToSet;
+		delete ApplicationStreamFPSButtons[2].label;
+		//set fps button label to the correct number. This one is used in the popup window that appears before you start streaming.
+		ApplicationStreamFPSButtons[2].label = fpsToSet.toString();
+		ApplicationStreamFPS.FPS_60 = fpsToSet;
+
+		Data.save('BDNitro', 'settings', settings);
+	} //End of unlockAndCustomizeStreamButtons()
+	//#endregion
+
+	//#region Video Quality Patch
 	videoQualityModule() {
 		//Custom Bitrates, FPS, Resolution
-		if (this.videoOptionFunctions == undefined) this.videoOptionFunctions = Webpack.getByPrototypeKeys('updateVideoQuality').prototype;
 
-		Patcher.before(this.meta.name, this.videoOptionFunctions, 'updateVideoQuality', (e) => {
+		Patcher.before(this.meta.name, videoOptionFunctions, 'updateVideoQuality', (e) => {
 			if (!e.videoQualityManager.qualityOverwrite) e.videoQualityManager.qualityOverwrite = {};
 
 			if (settings.minBitrate > 0 && settings.CustomBitrateEnabled) {
@@ -2346,7 +2568,6 @@ module.exports = class BDNitro {
 
 			//Video quality bypasses if Custom FPS is enabled.
 			if (settings.CustomFPSEnabled) {
-				//This is pretty self-explanatory.
 				e.videoQualityManager.options.videoBudget.framerate = settings.CustomFPS;
 				e.videoQualityManager.options.videoCapture.framerate = settings.CustomFPS;
 			}
@@ -2376,22 +2597,9 @@ module.exports = class BDNitro {
 					if (settings.CustomResolution > 1440) videoQuality.width = settings.CustomResolution;
 				}
 
-				//Ensure video budget quality parameters match stream parameters
+				//Ensure video budget and capture quality parameters match stream parameters
 				e.videoQualityManager.options.videoBudget = videoQuality;
-				//Ensure video capture quality parameters match stream parameters
 				e.videoQualityManager.options.videoCapture = videoQuality;
-
-				//janky camera bypass
-				if (e.stats?.camera != undefined) {
-					for (let i = 0; i < e.videoStreamParameters.length; i++) {
-						if (settings.ResolutionEnabled && settings.CustomResolution > -1) {
-							e.videoStreamParameters[i].maxResolution.height = settings.CustomResolution;
-							e.videoStreamParameters[i].maxResolution.width = parseInt((16 / 9) * settings.CustomResolution);
-							e.videoStreamParameters[i].maxPixelCount = e.videoStreamParameters[i].maxResolution.height * e.videoStreamParameters[i].maxResolution.width;
-						}
-						if (settings.CustomFPSEnabled && settings.CustomFPS > -1) e.videoStreamParameters[i].maxFrameRate = settings.CustomFPS;
-					}
-				}
 
 				//Ladder bypasses
 				let pixelBudget = videoQuality.width * videoQuality.height;
@@ -2399,94 +2607,11 @@ module.exports = class BDNitro {
 				e.videoQualityManager.ladder.ladder = LadderModule.calculateLadder(pixelBudget);
 				e.videoQualityManager.ladder.orderedLadder = LadderModule.calculateOrderedLadder(e.videoQualityManager.ladder.ladder);
 			}
-
-			// Video codecs
-			//todo: rewrite video codecs to actually work
 		});
 	} //End of videoQualityModule()
-
-	buttonCreate() {
-		//Creates the FPS and Resolution Swapper
-		let qualityButton = document.createElement('button');
-		qualityButton.id = 'qualityButton';
-		qualityButton.className = `${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand}`;
-		qualityButton.innerHTML = '<p style="display: block-inline; margin-left: -6%; margin-top: -4.5%;">Quality</p>';
-		qualityButton.style.position = 'absolute';
-		qualityButton.style.zIndex = '2';
-		qualityButton.style.bottom = '0';
-		qualityButton.style.left = '50%';
-		qualityButton.style.transform = 'translateX(-50%)';
-		qualityButton.style.height = '15px';
-		qualityButton.style.width = '48px';
-		qualityButton.style.verticalAlign = 'middle';
-		qualityButton.style.textAlign = 'left';
-		qualityButton.style.borderTopLeftRadius = '5px';
-		qualityButton.style.borderTopRightRadius = '4px';
-		qualityButton.style.borderBottomLeftRadius = '4px';
-		qualityButton.style.borderBottomRightRadius = '4px';
-
-		qualityButton.onclick = function () {
-			if (qualityMenu.style.visibility == 'hidden') {
-				qualityMenu.style.visibility = 'visible';
-			} else {
-				qualityMenu.style.visibility = 'hidden';
-			}
-		};
-
-		try {
-			document.getElementsByClassName(AccountDetailsClasses.container)[0].appendChild(qualityButton);
-		} catch (err) {
-			Logger.error(this.meta.name, "What the fuck happened..? Couldn't append child during buttonCreate() " + err);
-			return;
-		}
-
-		let qualityMenu = document.createElement('div');
-		qualityMenu.id = 'qualityMenu';
-		qualityMenu.style.visibility = 'hidden';
-		qualityMenu.style.position = 'relative';
-		qualityMenu.style.zIndex = '1';
-		qualityMenu.style.bottom = '410%';
-		qualityMenu.style.left = '-59%';
-		qualityMenu.style.height = '20px';
-		qualityMenu.style.width = '100px';
-		qualityMenu.onclick = function (event) {
-			event.stopPropagation();
-		};
-
-		document.getElementById('qualityButton').appendChild(qualityMenu);
-
-		let qualityInput = document.createElement('input');
-		qualityInput.id = 'qualityInput';
-		qualityInput.type = 'text';
-		qualityInput.placeholder = 'Resolution';
-		qualityInput.style.width = '33%';
-		qualityInput.style.zIndex = '1';
-		qualityInput.value = settings.CustomResolution;
-		qualityMenu.appendChild(qualityInput);
-
-		let qualityInputFPS = document.createElement('input');
-		qualityInputFPS.id = 'qualityInputFPS';
-		qualityInputFPS.type = 'text';
-		qualityInputFPS.placeholder = 'FPS';
-		qualityInputFPS.style.width = '33%';
-		qualityInputFPS.style.zIndex = '1';
-		qualityInputFPS.value = settings.CustomFPS;
-		qualityMenu.appendChild(qualityInputFPS);
-	} //End of buttonCreate()
+	//#endregion
 
 	async stickerSending() {
-		if (this.stickerSendabilityModule == undefined) this.stickerSendabilityModule = Webpack.getByKeys('cO', 'eb', 'kl');
-
-		//getStickerSendability
-		Patcher.instead(this.meta.name, this.stickerSendabilityModule, 'cO', () => {
-			return 0;
-		});
-
-		//isSendableSticker
-		Patcher.instead(this.meta.name, this.stickerSendabilityModule, 'kl', () => {
-			return true;
-		});
-
 		Patcher.instead(this.meta.name, MessageActions, 'sendStickers', (_, args, originalFunction) => {
 			let stickerID = args[1][0];
 			let stickerURL = 'https://media.discordapp.net/stickers/' + stickerID + '.png?size=4096&quality=lossless';
@@ -2507,6 +2632,7 @@ module.exports = class BDNitro {
 		});
 	}
 
+	//#region 3y3 Profile Colors
 	decodeAndApplyProfileColors() {
 		Patcher.after(this.meta.name, userProfileMod, 'getUserProfile', (_, args, ret) => {
 			if (ret == undefined) return;
@@ -2525,14 +2651,14 @@ module.exports = class BDNitro {
 
 	//Everything that has to do with the GUI and encoding of the fake profile colors 3y3 shit.
 	//Replaced DOM manipulation with React patching 4/2/2024
-	async encodeProfileColors(primary, accent) {
+	async encodeProfileColors() {
 		//wait for theme color picker module to be loaded
 		await Webpack.waitForModule(Webpack.Filters.byProps('getTryItOutThemeColors'));
 
 		//wait for color picker renderer module to be loaded
 		await Webpack.waitForModule(Webpack.Filters.byStrings('__invalid_profileThemesSection'));
 
-		if (this.colorPickerRendererMod == undefined) this.colorPickerRendererMod = Webpack.getAllByKeys('Z').filter((obj) => obj.Z.toString().includes('__invalid_profileThemesSection'))[0];
+		if (this.colorPickerRendererMod == undefined) this.colorPickerRendererMod = Webpack.getByStrings('__invalid_profileThemesSection', { defaultExport: false });
 
 		Patcher.after(this.meta.name, this.colorPickerRendererMod, 'Z', (_, args, ret) => {
 			ret.props.children.props.children.push(
@@ -2590,7 +2716,9 @@ module.exports = class BDNitro {
 			);
 		});
 	} //End of encodeProfileColors()
+	//#endregion
 
+	//#region Banner Decoding
 	//Decode 3y3 from profile bio and apply fake banners.
 	bannerUrlDecoding() {
 		let endpoint, bucket, prefix, data;
@@ -2677,45 +2805,22 @@ module.exports = class BDNitro {
 			//return final banner URL.
 			return `https://i.imgur.com/${matchedText}`;
 		}); //End of patch for getBannerURL
-
-		if (this.profileRenderer == undefined) this.profileRenderer = Webpack.getAllByKeys('Z').filter((obj) => obj.Z.toString().includes('PRESS_PREMIUM_UPSELL'))[0];
-
-		Patcher.before(this.meta.name, this.profileRenderer, 'Z', (_, args) => {
-			if (args == undefined) return;
-			if (args[0]?.displayProfile?.banner == undefined) return;
-
-			//if this user's banner is a fake banner
-			if (args[0].displayProfile.banner == 'funky_kong_is_epic') {
-				//don't show upsell
-				args[0].showPremiumBadgeUpsell = false;
-			}
-		});
-
-		Patcher.after(this.meta.name, this.profileRenderer, 'Z', (_, args, ret) => {
-			if (args == undefined) return;
-			if (args[0]?.displayProfile?.banner == undefined) return;
-			if (ret == undefined) return;
-			if (ret.props?.hasBanner == undefined) return;
-			//if this user's banner is a fake banner
-			if (args[0].displayProfile.banner == 'funky_kong_is_epic') {
-				//tell the profile renderer to show them as having a banner.
-				ret.props.hasBanner = true;
-			}
-		});
 	} //End of bannerUrlDecoding()
+	//#endregion
 
+	//#region Banner Encoding
 	//Make buttons in profile customization settings, encode imgur URLs and copy to clipboard
 	//Documented/commented and partially rewritten to use React patching on 3/6/2024
 	async bannerUrlEncoding(secondsightifyEncodeOnly) {
 		//wait for banner customization renderer module to be loaded
 		await Webpack.waitForModule(Webpack.Filters.byStrings('showRemoveBannerButton', 'isTryItOutFlow', 'buttonsContainer'));
-		this.profileBannerSectionRenderer = Webpack.getAllByKeys('Z').filter((obj) => obj.Z.toString().includes('showRemoveBannerButton') && obj.Z.toString().includes('isTryItOutFlow') && obj.Z.toString().includes('buttonsContainer'))[0];
+		if (this.profileBannerSectionRenderer == undefined) this.profileBannerSectionRenderer = Webpack.getByStrings('showRemoveBannerButton', 'isTryItOutFlow', 'buttonsContainer', { defaultExport: false });
 
 		Patcher.after(this.meta.name, this.profileBannerSectionRenderer, 'Z', (_, args, ret) => {
 			//create and append profileBannerUrlInput input element.
 			let profileBannerUrlInput = React.createElement('input', {
 				id: 'profileBannerUrlInput',
-				placeholder: 'Imgur URL',
+				placeholder: 'Imgur URL for Banner',
 				style: {
 					float: 'right',
 					width: '30%',
@@ -2838,7 +2943,9 @@ module.exports = class BDNitro {
 			); //end of profileBannerButton element push
 		}); //end of patched function
 	} //End of bannerUrlEncoding()
+	//#endregion
 
+	//#region App Icons
 	appIcons() {
 		settings.changePremiumType = true; //Forcibly enable premiumType. Couldn't find a workaround, sry.
 
@@ -2855,29 +2962,29 @@ module.exports = class BDNitro {
 			Logger.error(this.meta.name, 'Error occurred changing premium type. ' + err);
 		}
 
-		if (this.appIconModule == undefined) this.appIconModule = Webpack.getByKeys('getCurrentDesktopIcon');
-		delete this.appIconModule.isUpsellPreview;
-		Object.defineProperty(this.appIconModule, 'isUpsellPreview', {
+		delete appIconModule.isUpsellPreview;
+		Object.defineProperty(appIconModule, 'isUpsellPreview', {
 			value: false,
 			configurable: true,
 			enumerable: true,
 			writable: true
 		});
 
-		delete this.appIconModule.isEditorOpen;
-		Object.defineProperty(this.appIconModule, 'isEditorOpen', {
+		delete appIconModule.isEditorOpen;
+		Object.defineProperty(appIconModule, 'isEditorOpen', {
 			value: false,
 			configurable: true,
 			enumerable: true,
 			writable: true
 		});
 
-		if (this.appIconButtonsModule == undefined) this.appIconButtonsModule = Webpack.getAllByKeys('Z').filter((obj) => obj.Z.toString().includes('renderCTAButtons'))[0];
-		Patcher.before(this.meta.name, this.appIconButtonsModule, 'Z', (_, args) => {
+		Patcher.before(this.meta.name, appIconButtonsModule, 'Z', (_, args) => {
 			args[0].disabled = false; //force buttons clickable
 		});
 	}
+	//#endregion
 
+	//#region Meta and Updates
 	parseMeta(fileContent) {
 		//zlibrary code
 		const splitRegex = /[^\S\r\n]*?\r?(?:\r\n|\n)[^\S\r\n]*?\*[^\S\r\n]?/;
@@ -2925,7 +3032,7 @@ module.exports = class BDNitro {
 	newUpdateNotify(remoteMeta, remoteFile) {
 		Logger.info(this.meta.name, 'A new update is available!');
 
-		UI.showConfirmationModal('Update Available', [`Update ${remoteMeta.version} is now available for DBNitro!`, 'Press Download Now to update!'], {
+		UI.showConfirmationModal('Update Available', [`Update ${remoteMeta.version} is now available for BDNitro!`, 'Press Download Now to update!'], {
 			confirmText: 'Download Now',
 			onConfirm: async (e) => {
 				if (remoteFile) {
@@ -2934,12 +3041,16 @@ module.exports = class BDNitro {
 						let currentVersionInfo = Data.load(this.meta.name, 'currentVersionInfo');
 						currentVersionInfo.hasShownChangelog = false;
 						Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
-					} catch (err) {}
+					} catch (err) {
+						UI.showToast('An error occurred when trying to download the update!', { type: 'error' });
+					}
 				}
 			}
 		});
 	}
+	//#endregion
 
+	//#region Start, Stop
 	start() {
 		Logger.info(this.meta.name, '(v' + this.meta.version + ') has started.');
 
@@ -2961,11 +3072,11 @@ module.exports = class BDNitro {
 		try {
 			let currentVersionInfo = {};
 			try {
-				currentVersionInfo = Object.assign({}, { version: this.meta.version, hasShownChangelog: false }, Data.load('DBNitro', 'currentVersionInfo'));
+				currentVersionInfo = Object.assign({}, { version: this.meta.version, hasShownChangelog: false }, Data.load('BDNitro', 'currentVersionInfo'));
 			} catch (err) {
 				currentVersionInfo = { version: this.meta.version, hasShownChangelog: false };
 			}
-
+			if (this.meta.version != currentVersionInfo.version) currentVersionInfo.hasShownChangelog = false;
 			currentVersionInfo.version = this.meta.version;
 			Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
 
@@ -2973,7 +3084,7 @@ module.exports = class BDNitro {
 
 			if (!currentVersionInfo.hasShownChangelog) {
 				UI.showChangelogModal({
-					title: 'DBNitro Changelog',
+					title: 'BDNitro Changelog',
 					subtitle: config.changelog[0].title,
 					changes: [
 						{
@@ -2997,22 +3108,14 @@ module.exports = class BDNitro {
 		CurrentUser.premiumType = ORIGINAL_NITRO_STATUS;
 		Patcher.unpatchAll(this.meta.name);
 		Dispatcher.unsubscribe('COLLECTIBLES_CATEGORIES_FETCH_SUCCESS', this.storeProductsFromCategories);
-		if (document.getElementById('qualityButton')) document.getElementById('qualityButton').remove();
-		if (document.getElementById('qualityMenu')) document.getElementById('qualityMenu').remove();
-		if (document.getElementById('qualityInput')) document.getElementById('qualityInput').remove();
-		if (document.getElementById('copy3y3button')) document.getElementById('copy3y3button').remove();
-		if (document.getElementById('profileBannerButton')) document.getElementById('profileBannerButton').remove();
-		if (document.getElementById('profileBannerUrlInput')) document.getElementById('profileBannerUrlInput').remove();
-		if (document.getElementById('decorationButton')) document.getElementById('decorationButton').remove();
-		if (document.getElementById('changeProfileEffectButton')) document.getElementById('changeProfileEffectButton').remove();
-		if (document.getElementById('profilePictureUrlInput')) document.getElementById('profilePictureUrlInput').remove();
-		if (document.getElementById('profilePictureButton')) document.getElementById('profilePictureButton').remove();
-		BdApi.DOM.removeStyle(this.meta.name);
-		BdApi.DOM.removeStyle('BDNitroBadges');
-		BdApi.DOM.removeStyle('UsrBGIntegration');
+		DOM.removeStyle(this.meta.name);
+		DOM.removeStyle('YABDP4NitroBadges');
+		DOM.removeStyle('UsrBGIntegration');
 		usrBgUsers = [];
 		BdApi.unlinkJS('ffmpeg.js');
 		Logger.info(this.meta.name, '(v' + this.meta.version + ') has stopped.');
 	}
+	// #endregion
 };
+// #endregion
 /*@end@*/
