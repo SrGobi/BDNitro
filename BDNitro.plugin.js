@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.5
+ * @version 5.6.6
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -132,7 +132,7 @@ const defaultSettings = {
 	profileV2: false,
 	forceStickersUnlocked: false,
 	changePremiumType: false,
-	videoCodec: -1,
+	videoCodec2: -1,
 	clientThemes: true,
 	lastGradientSettingStore: -1,
 	fakeProfileThemes: true,
@@ -174,27 +174,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.5',
+		version: '5.6.6',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.5',
-			items: [
-				'Finally add back the option to force a specific video codec to be used during screenshare but this time it actually works. For advanced users only.',
-				'Add Soundmoji Bypass.',
-				'Completely replace old Stream Settings Quick Swapper with a much better version of it which can now be found within the stream settings modal.',
-				"Restore Profile section of settings. For some reason nobody mentioned that it was gone, and I didn't notice I forgot to add it when remaking the settings panel. Oops.",
-				'Massive thanks to Arven (zrodevkaan) for all the help in learning how to use getMangled, providing a handful of improved module filters, and teaching me some better ways to fetch modules!',
-				'Replaced most, if not all old shitty module filters with improved ones.',
-				"Moved most module fetches that weren't at the top of the file to the top, excluding those which load asynchronously.",
-				"Removed repeated code previously in both updateQuick and customVideoSettings, now it's only in a new function called unlockAndCustomizeStreamButtons.",
-				'Added region markers to the code so that it is 100x easier to find stuff in the plugin when using a code editor e.g. VSCode.',
-				'Random small code improvements in a few places.',
-				'Reformat code  -- remove several unnecessary spaces.'
-			]
+			title: '5.6.6',
+			items: ['Change videoCodec setting id to videoCodec2 to force everybody to be reset to the default option since users with older configs were being set to Force AV1 when upgrading.']
 		}
 	],
 	settingsPanel: [
@@ -236,14 +224,14 @@ const config = {
 				{ type: 'text', id: 'voiceBitrate', name: 'Voice Audio Bitrate', note: "Allows you to change the voice bitrate to whatever you want. Does not allow you to go over the voice channel's set bitrate but it does allow you to go much lower. (bitrate in kbps). Disabled if this is set to 128 or -1.", value: () => settings.voiceBitrate },
 				{
 					type: 'dropdown',
-					id: 'videoCodec',
+					id: 'videoCodec2',
 					name: 'Force Video Codec (Advanced Users Only)',
 					note: `
                     Allows you to force a specified video codec to be used. Normally, Discord would automatically 
                     choose this based on your hardware, options in Voice & Video, and the viewers watching.
                     Mobile and Web clients can only view H.264 and VP8 streams.
                     If a client does not support the codec you choose, the stream will infinitely load for them!`,
-					value: () => settings.videoCodec,
+					value: () => settings.videoCodec2,
 					options: [
 						{ label: 'Default (recommended, automatic)', value: -1 },
 						{ label: 'AV1', value: 0 },
@@ -614,7 +602,7 @@ module.exports = class BDNitro {
 
 		if (settings.soundmojiEnabled || (settings.emojiBypass && settings.emojiBypassType == 0)) this._sendMessageInsteadPatch();
 
-		if (settings.videoCodec > -1) this.videoCodecs();
+		if (settings.videoCodec2 > -1) this.videoCodecs();
 	} //End of saveAndUpdate()
 	// #endregion
 
@@ -698,7 +686,7 @@ module.exports = class BDNitro {
 
 	videoCodecs() {
 		Patcher.after(this.meta.name, streamSettingsMod, 'getCodecOptions', (_, args, ret) => {
-			ret.videoEncoder = ret.videoDecoders[settings.videoCodec];
+			ret.videoEncoder = ret.videoDecoders[settings.videoCodec2];
 		});
 	}
 
