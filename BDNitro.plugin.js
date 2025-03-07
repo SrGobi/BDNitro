@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.6.8
+ * @version 5.6.9
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -174,15 +174,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.6.8',
+		version: '5.6.9',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.6.8',
-			items: ['Replaced accidentally hardcoded button size attributes with bd-button-small, which does nothing since the classes are correct, but Arven demanded it for some reason.', 'Removed UsrBG CSS which was doing seemingly nothing except causing unnecessary lag with forced reflows. Thanks UsrBG.', "Removed a function that wasn't being run that I accidentally left in the file."]
+			title: '5.6.9',
+			items: ["Make Clips Bypass more reliable by checking if ffmpeg is loaded upon adding a file and triggering it to load if it isn't.", 'Fixed the screen share getting put into an infinite buffering screen when turning on or off the camera.']
 		}
 	],
 	settingsPanel: [
@@ -683,6 +683,11 @@ module.exports = class BDNitro {
 
 	// #region Clips Bypass
 	async clipsBypass() {
+		/* If ffmpeg isn't loaded, or was unloaded for some reason,
+               when the user adds a file, make sure to load it again if it's undefined
+               If we don't do this check, then the user would have to
+               trigger saveAndUpdate or restart the plugin to
+               make ffmpeg load if it wasn't loaded properly the first time. */
 		if (ffmpeg == undefined) await this.loadFFmpeg();
 
 		async function ffmpegTransmux(arrayBuffer, fileName = 'input.mp4') {
@@ -2452,20 +2457,13 @@ module.exports = class BDNitro {
 	//#region Video Quality Patch
 	videoQualityModule() {
 		//Custom Bitrates, FPS, Resolution
-
 		Patcher.before(this.meta.name, videoOptionFunctions, 'updateVideoQuality', (e) => {
-			if (!e.videoQualityManager.qualityOverwrite) e.videoQualityManager.qualityOverwrite = {};
-
 			if (settings.minBitrate > 0 && settings.CustomBitrateEnabled) {
 				//Minimum Bitrate
-				e.framerateReducer.sinkWants.qualityOverwrite.bitrateMin = settings.minBitrate * 1000;
-				e.videoQualityManager.qualityOverwrite.bitrateMin = settings.minBitrate * 1000;
 				e.videoQualityManager.options.videoBitrateFloor = settings.minBitrate * 1000;
 				e.videoQualityManager.options.videoBitrate.min = settings.minBitrate * 1000;
 				e.videoQualityManager.options.desktopBitrate.min = settings.minBitrate * 1000;
 			} else {
-				e.framerateReducer.sinkWants.qualityOverwrite.bitrateMin = 150000;
-				e.videoQualityManager.qualityOverwrite.bitrateMin = 150000;
 				e.videoQualityManager.options.videoBitrateFloor = 150000;
 				e.videoQualityManager.options.videoBitrate.min = 150000;
 				e.videoQualityManager.options.desktopBitrate.min = 150000;
@@ -2473,27 +2471,19 @@ module.exports = class BDNitro {
 
 			if (settings.maxBitrate > 0 && settings.CustomBitrateEnabled) {
 				//Maximum Bitrate
-				e.framerateReducer.sinkWants.qualityOverwrite.bitrateMax = settings.maxBitrate * 1000;
-				e.videoQualityManager.qualityOverwrite.bitrateMax = settings.maxBitrate * 1000;
 				e.videoQualityManager.options.videoBitrate.max = settings.maxBitrate * 1000;
 				e.videoQualityManager.options.desktopBitrate.max = settings.maxBitrate * 1000;
 			} else {
 				//Default max bitrate
-				e.framerateReducer.sinkWants.qualityOverwrite.bitrateMax = 2500000;
-				e.videoQualityManager.qualityOverwrite.bitrateMax = 2500000;
 				e.videoQualityManager.options.videoBitrate.max = 2500000;
 				e.videoQualityManager.options.desktopBitrate.max = 2500000;
 			}
 
 			if (settings.targetBitrate > 0 && settings.CustomBitrateEnabled) {
 				//Target Bitrate
-				e.framerateReducer.sinkWants.qualityOverwrite.bitrateTarget = settings.targetBitrate * 1000;
-				e.videoQualityManager.qualityOverwrite.bitrateTarget = settings.targetBitrate * 1000;
 				e.videoQualityManager.options.desktopBitrate.target = settings.targetBitrate * 1000;
 			} else {
 				//Default target bitrate
-				e.framerateReducer.sinkWants.qualityOverwrite.bitrateTarget = 600000;
-				e.videoQualityManager.qualityOverwrite.bitrateTarget = 600000;
 				e.videoQualityManager.options.desktopBitrate.target = 600000;
 			}
 
