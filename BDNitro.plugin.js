@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.7.1
+ * @version 5.7.2
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -166,15 +166,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.7.1',
+		version: '5.7.2',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.7.1',
-			items: ['Rewrite of In-App Icons. It will no longer enable Premium Type (nor require it to be enabled), and should be much more reliable.', 'Fixed error appearing in console when switching from a gradient theme to a default theme.']
+			title: '5.7.2',
+			items: ["Made it so that if you see a user with an avatar decoration, that avatar decoration is added to your list of available fake avatar decorations. Try and collect 'em all like Pokemon.", 'Made the plugin save settings on stop.', 'More changes to Experiments code.']
 		}
 	],
 	settingsPanel: [
@@ -892,24 +892,17 @@ module.exports = class BDNitro {
 			//wait for modules to be loaded
 			await Webpack.waitForModule(Webpack.Filters.byStoreName('DeveloperExperimentStore'));
 			await Webpack.waitForModule(Webpack.Filters.byStoreName('ExperimentStore'));
-			//code slightly modified from https://gist.github.com/JohannesMP/afdf27383608c3b6f20a6a072d0be93c?permalink_comment_id=4784940#gistcomment-4784940
-			let wpRequire;
-			webpackChunkdiscord_app.push([
-				[Math.random()],
-				{},
-				(req) => {
-					wpRequire = req;
-				}
-			]);
-			let u = Webpack.getByKeys('ASSISTANT_WUMPUS_VOICE_USER', 'default').default;
-			let m = Object.values(u._dispatcher._actionHandlers._dependencyGraph.nodes);
+			await Webpack.waitForModule(Webpack.Filters.byStoreName('UserStore'));
+			//code heavily modified from https://gist.github.com/JohannesMP/afdf27383608c3b6f20a6a072d0be93c?permalink_comment_id=4784940#gistcomment-4784940
+
+			let Stores = Object.values(UserStore._dispatcher._actionHandlers._dependencyGraph.nodes);
 
 			CurrentUser.flags |= 1;
-			m.find((x) => x.name === 'DeveloperExperimentStore').actionHandler['CONNECTION_OPEN']();
+			Stores.find((x) => x.name === 'DeveloperExperimentStore').actionHandler['CONNECTION_OPEN']();
 			try {
-				m.find((x) => x.name === 'ExperimentStore').actionHandler['OVERLAY_INITIALIZE']({ user: { flags: 1 } });
+				Stores.find((x) => x.name === 'ExperimentStore').actionHandler['OVERLAY_INITIALIZE']({ user: { flags: 1 } });
 			} catch {}
-			m.find((x) => x.name === 'ExperimentStore').storeDidChange();
+			Stores.find((x) => x.name === 'ExperimentStore').storeDidChange();
 		} catch (err) {
 			Logger.warn(this.meta.name, err);
 		}
@@ -1595,6 +1588,18 @@ module.exports = class BDNitro {
 			if (ret == undefined) return;
 			let avatarDecorations = settings.avatarDecorations;
 
+			//user has an avatar decoration
+			if (ret.avatarDecorationData) {
+				//error check
+				if (avatarDecorations) {
+					//dont process fake avatar decorations
+					if (ret.avatarDecorationData.sku_id != '0') {
+						//cache avatar decoration
+						avatarDecorations[ret.avatarDecorationData.skuId] = ret.avatarDecorationData.asset;
+					}
+				}
+			}
+
 			function getRevealedText(self) {
 				let revealedTextLocal = ''; //init empty string with local scope
 				let userProfile = userProfileMod.getUserProfile(args[0]); //get the user's profile from the cached user profiles
@@ -1653,7 +1658,7 @@ module.exports = class BDNitro {
 				//set avatar decoration data to fake avatar decoration
 				ret.avatarDecorationData = {
 					asset: avatarDecorations[assetId],
-					sku_id: '1144003461608906824' //dummy sku id
+					sku_id: '0' //dummy sku id
 				};
 
 				//add user to the list of users to show with the BDNitro user badge if we haven't already.
@@ -3024,6 +3029,7 @@ module.exports = class BDNitro {
 		DOM.removeStyle('BDNitroBadges');
 		usrBgUsers = [];
 		BdApi.unlinkJS('ffmpeg.js');
+		Data.save('BDNitroBadges', 'settings', settings);
 		Logger.info(this.meta.name, '(v' + this.meta.version + ') has stopped.');
 	}
 	// #endregion
