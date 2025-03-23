@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.7.2
+ * @version 5.7.3
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -166,15 +166,15 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.7.2',
+		version: '5.7.3',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.7.2',
-			items: ["Made it so that if you see a user with an avatar decoration, that avatar decoration is added to your list of available fake avatar decorations. Try and collect 'em all like Pokemon.", 'Made the plugin save settings on stop.', 'More changes to Experiments code.']
+			title: '5.7.3',
+			items: ['Added support for selectable Nitro badges, improved custom badge management, and optimized badge loading code.']
 		}
 	],
 	settingsPanel: [
@@ -193,7 +193,25 @@ const config = {
 				{ type: 'switch', id: 'bug_hunter_level_1', name: 'Bug Hunter', note: 'Desbloquea el badge de cazador de bugs', value: () => settings.bug_hunter_level_1 },
 				{ type: 'switch', id: 'verified_developer', name: 'Early Bot Developer', note: 'Desbloquea el badge de desarrollador de bots temprano', value: () => settings.verified_developer },
 				{ type: 'switch', id: 'NITRO', name: 'Nitro', note: 'Desbloquea el badge de Nitro', value: () => settings.NITRO },
-				{ type: 'switch', id: 'early_supporter', name: 'Early Supporter', note: 'Desbloquea el badge de Early Supporter', value: () => settings.early_supporter }
+				{ type: 'switch', id: 'early_supporter', name: 'Early Supporter', note: 'Desbloquea el badge de Early Supporter', value: () => settings.early_supporter },
+				{
+					type: 'dropdown',
+					id: 'nitroBadge',
+					name: 'Badge de Nitro',
+					note: 'Selecciona un badge de Nitro. Solo puedes activar uno a la vez.',
+					value: () => settings.nitroBadge,
+					options: [
+						{ label: 'Ninguno', value: '' },
+						{ label: 'Bronce', value: 'bronze' },
+						{ label: 'Plata', value: 'silver' },
+						{ label: 'Oro', value: 'gold' },
+						{ label: 'Platino', value: 'platinum' },
+						{ label: 'Diamante', value: 'diamond' },
+						{ label: 'Esmeralda', value: 'emerald' },
+						{ label: 'Rubí', value: 'ruby' },
+						{ label: 'Ópalo', value: 'opal' }
+					]
+				}
 			]
 		},
 		{
@@ -1232,19 +1250,13 @@ module.exports = class BDNitro {
 
 	// Aplicar badges customizados
 	LoadingBadges() {
-		// Uso de la insignia de usuario de BDNitro
-		DOM.addStyle(
-			'BDNitroBadges',
-			`
-        a[aria-label="¡Un compañero usuario de BDNitro!"] img {
-            content: url("https://raw.githubusercontent.com/SrGobi/BDNitro/main/badges/bd_user.svg") !important;
-        }
-        
-        div [aria-label="¡Un compañero usuario de BDNitro!"] > a > img {
-            content: url("https://raw.githubusercontent.com/SrGobi/BDNitro/main/badges/bd_user.svg") !important;
-        }
-    `
-		);
+		// Añadir estilos para los badges personalizados
+		const badgeStyles = `
+			div[aria-label="¡Un compañero usuario de BDNitro!"] > a > img {
+				content: url("https://raw.githubusercontent.com/SrGobi/BDNitro/main/badges/bd_user.svg") !important;
+			}
+    `;
+		DOM.addStyle('BDNitroBadges', badgeStyles);
 
 		// Configura las prioridades de las insignias
 		const badgeConfig = {
@@ -1300,7 +1312,7 @@ module.exports = class BDNitro {
 			NITRO: {
 				id: 'NITRO',
 				icon: '2ba85e8026a8614b640c2837bcdfe21b',
-				description: 'Nitro User',
+				description: 'Suscriptor desde 2025',
 				link: 'https://github.com/srgobi/BDNitro#contributors',
 				priority: 8
 			},
@@ -1317,21 +1329,71 @@ module.exports = class BDNitro {
 				id: 'early_supporter',
 				link: 'https://discord.com/settings/premium',
 				priority: 10
+			},
+			bronze: {
+				id: 'bronze',
+				icon: '4f33c4a9c64ce221936bd256c356f91f',
+				description: 'Con suscripción desde 01/01/2025',
+				link: 'https://discord.com/settings/premium',
+				priority: 11
+			},
+			silver: {
+				id: 'silver',
+				icon: '4514fab914bdbfb4ad2fa23df76121a6',
+				description: 'Con suscripción desde 01/01/2024',
+				link: 'https://discord.com/settings/premium',
+				priority: 12
+			},
+			gold: {
+				id: 'gold',
+				icon: '2895086c18d5531d499862e41d1155a6',
+				description: 'Con suscripción desde 01/01/2023',
+				link: 'https://discord.com/settings/premium',
+				priority: 13
+			},
+			platinum: {
+				id: 'platinum',
+				icon: '0334688279c8359120922938dcb1d6f8',
+				description: 'Con suscripción desde 01/01/2022',
+				link: 'https://discord.com/settings/premium',
+				priority: 14
+			},
+			diamond: {
+				id: 'diamond',
+				icon: '0d61871f72bb9a33a7ae568c1fb4f20a',
+				description: 'Con suscripción desde 01/01/2021',
+				link: 'https://discord.com/settings/premium',
+				priority: 15
+			},
+			emerald: {
+				id: 'emerald',
+				icon: '11e2d339068b55d3a506cff34d3780f3',
+				description: 'Con suscripción desde 01/01/2020',
+				link: 'https://discord.com/settings/premium',
+				priority: 16
+			},
+			ruby: {
+				id: 'ruby',
+				icon: 'cd5e2cfd9d7f27a8cdcd3e8a8d5dc9f4',
+				description: 'Con suscripción desde 01/01/2019',
+				link: 'https://discord.com/settings/premium',
+				priority: 17
+			},
+			opal: {
+				id: 'opal',
+				icon: '5b154df19c53dce2af92c9b61e6be5e2',
+				description: 'Con suscripción desde 01/01/2018',
+				link: 'https://discord.com/settings/premium',
+				priority: 18
 			}
 		};
 
 		// Parches de insignia de perfil de usuario
 		Patcher.after(this.meta.name, userProfileMod, 'getUserProfile', (_, args, ret) => {
 			// Comprobaciones de datos
-			if (ret == undefined) return;
-			if (ret.userId == undefined) return;
-			if (ret.badges == undefined) return;
+			if (!ret || !ret.userId || !ret.badges) return;
 
-			const badgesList = []; // Lista de ID de credencial del usuario actualmente procesado
-
-			for (let i = 0; i < ret.badges.length; i++) {
-				badgesList.push(ret.badges[i].id); // Agregar cada una de las ID de insignia de este usuario a BadgesList
-			}
+			const badgesList = ret.badges.map((badge) => badge.id); // Lista de IDs de badges ya presentes
 
 			// Añadir insignias personalizadas a la lista si no están ya presentes
 			if (badgeUserIDs.includes(ret.userId) && !badgesList.includes('bd_user')) {
@@ -1374,13 +1436,25 @@ module.exports = class BDNitro {
 				ret.badges.push(badgeConfig['early_supporter']);
 			}
 
+			// Añadir el badge de Nitro seleccionado
+			const selectedNitroBadge = settings.nitroBadge;
+			const nitroBadges = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'emerald', 'ruby', 'opal'];
+
+			// Verifica si ya hay un badge de Nitro en la lista
+			const existingNitroBadge = badgesList.find((badgeId) => nitroBadges.includes(badgeId));
+
+			// Si no hay un badge de Nitro y hay uno seleccionado, agrégalo
+			if (!existingNitroBadge && selectedNitroBadge && badgeConfig[selectedNitroBadge]) {
+				ret.badges.push(badgeConfig[selectedNitroBadge]);
+			}
+
 			// Ordenar las insignias en función de su prioridad
 			ret.badges.sort((a, b) => {
 				const priorityA = badgeConfig[a.id]?.priority || Number.MAX_VALUE;
 				const priorityB = badgeConfig[b.id]?.priority || Number.MAX_VALUE;
 				return priorityA - priorityB;
 			});
-		}); // Fin del parche de getUserProfile
+		});
 	} // Fin de LoadingBadges()
 	// #endregion
 
