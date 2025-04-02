@@ -1,7 +1,7 @@
 /**
  * @name BDNitro
  * @author SrGobi
- * @version 5.7.3
+ * @version 5.7.4
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -100,6 +100,15 @@ const AppIcon = Webpack.getByStrings('getCurrentDesktopIcon', 'isEditorOpen', 'i
 const RegularAppIcon = Webpack.getByStrings('M19.73 4.87a18.2', { searchExports: true });
 const CurrentDesktopIcon = Webpack.getByKeys('getCurrentDesktopIcon');
 const CustomAppIcon = Webpack.getByStrings('.iconSource,width:');
+const ClipsEnabledMod = Webpack.getMangled('useExperiment({location:"useEnableClips"', {
+	useEnableClips: Webpack.Filters.byStrings('useExperiment({location:"useEnableClips"'),
+	areClipsEnabled: Webpack.Filters.byStrings('areClipsEnabled'),
+	isPremium: Webpack.Filters.byStrings('isPremiumAtLeast')
+});
+const ClipsAllowedMod = Webpack.getMangled(`let{ignorePlatformRestriction:`, {
+	isClipsClientCapable: (x) => x == x //just get the first result lol
+});
+const ClipsMod = Webpack.getByKeys(`isViewerClippingAllowedForUser`);
 //#endregion
 
 const defaultSettings = {
@@ -166,15 +175,22 @@ const config = {
 				github_username: 'srgobi'
 			}
 		],
-		version: '5.7.3',
+		version: '5.7.4',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '5.7.3',
-			items: ['Added support for selectable Nitro badges, improved custom badge management, and optimized badge loading code.']
+			title: '5.7.4',
+			items: [
+				"Made it so you can properly switch to and from the new Dark and Onyx themes from the Desktop Visual Refresh when Nitro Client Themes is enabled. I would've pushed this fix earlier, but I thought I already did for some reason.",
+				'Updated descriptions of the Clips and Soundmoji bypasses to mention that Experiments will be enabled if they are enabled.',
+				"Made it so FFmpeg.js is now loaded from GitHub instead of unpkg due to unpkg adding a CORS policy which was causing it to fail to load for some users. This also has the benefit of being (potentially) faster and more reliable than unpkg, so it's a win-win.",
+				'Made it so the Clips Bypass puts the name of the file without the extension as the title of the clip.',
+				'Removed the "Transmuxing video..." toast when using Clips since the transmux is so short that the message is basically pointless other than to confirm whether or not the bypass is loaded and enabled.',
+				'Added toast message if there is an error at some point when processing a non-MP4 file for the Clips Bypass.'
+			]
 		}
 	],
 	settingsPanel: [
@@ -300,7 +316,7 @@ const config = {
 				{ type: 'switch', id: 'uploadStickers', name: 'Upload Stickers', note: 'Upload stickers in the same way as emotes.', value: () => settings.uploadStickers },
 				{ type: 'switch', id: 'forceStickersUnlocked', name: 'Force Stickers Unlocked', note: 'Enable to cause Stickers to be unlocked.', value: () => settings.forceStickersUnlocked },
 				{ type: 'switch', id: 'fakeInlineVencordEmotes', name: 'Fake Inline Hyperlink Emotes', note: 'Makes hyperlinked emojis appear as if they were real emojis, inlined in the message, similar to Vencord FakeNitro emotes.', value: () => settings.fakeInlineVencordEmotes },
-				{ type: 'switch', id: 'soundmojiEnabled', name: 'Soundmoji Bypass', note: 'Unlocks soundmojis and allows you to "send" them by automatically replacing them with a MP3 upload and some special text that will make them render as real soundmojis on the client side.', value: () => settings.soundmojiEnabled }
+				{ type: 'switch', id: 'soundmojiEnabled', name: 'Soundmoji Bypass', note: 'Unlocks soundmojis and allows you to "send" them by automatically replacing them with a MP3 upload and some special text that will make them render as real soundmojis on the client side. Please note that this will enable Experiments.', value: () => settings.soundmojiEnabled }
 			]
 		},
 		{
@@ -328,7 +344,7 @@ const config = {
 			collapsible: true,
 			shown: false,
 			settings: [
-				{ type: 'switch', id: 'useClipBypass', name: 'Use Clips Bypass', note: 'Enabling this will effectively set your file upload limit for video files to 100MB. Disable this if you have a file upload limit larger than 100MB.', value: () => settings.useClipBypass },
+				{ type: 'switch', id: 'useClipBypass', name: 'Use Clips Bypass', note: 'Enabling this will effectively set your file upload limit for video files to 100MB. Disable this if you have a file upload limit larger than 100MB. Enabling this option will also enable Experiments.', value: () => settings.useClipBypass },
 				{ type: 'switch', id: 'alwaysTransmuxClips', name: 'Force Transmuxing', note: 'Always transmux the video, even if transmuxing would normally be skipped. Transmuxing is only ever skipped if the codec does not include AVC1 or includes MP42.', value: () => settings.alwaysTransmuxClips },
 				{ type: 'switch', id: 'forceClip', name: 'Force Clip', note: 'Always send video files as a clip, even if the size is below 10MB.', value: () => settings.forceClip }
 			]
@@ -538,6 +554,8 @@ module.exports = class BDNitro {
 		DOM.removeStyle('BDNitroBadges');
 		try {
 			this.LoadingBadges();
+			// Actualizar el estado personalizado con los badges seleccionados
+			this.updateCustomStatus();
 		} catch (err) {
 			Logger.error(this.meta.name, 'An error occurred during LoadingBadges() ' + err);
 		}
@@ -707,7 +725,7 @@ module.exports = class BDNitro {
 
 		async function ffmpegTransmux(arrayBuffer, fileName = 'input.mp4') {
 			if (ffmpeg) {
-				UI.showToast('Transmuxing video...', { type: 'info' });
+				//UI.showToast("Transmuxing video...", { type: "info" });
 				ffmpeg.on('log', ({ message }) => {
 					console.log(message);
 				});
@@ -734,6 +752,19 @@ module.exports = class BDNitro {
 
 				//larger than 10mb
 				if (currentFile.file.size > 10485759 || settings.forceClip) {
+					const clipData = {
+						id: '',
+						version: 3,
+						applicationName: '',
+						applicationId: '1301689862256066560',
+						users: [CurrentUser.id],
+						clipMethod: 'manual',
+						length: currentFile.file.size,
+						thumbnail: '',
+						filepath: '',
+						name: currentFile.file.name.substring(0, currentFile.file.name.lastIndexOf('.'))
+					};
+
 					//if this file is an mp4 file
 					if (currentFile.file.type == 'video/mp4') {
 						let dontStopMeNow = true;
@@ -784,17 +815,7 @@ module.exports = class BDNitro {
 								}
 
 								//send as a "clip"
-								currentFile.clip = {
-									id: '',
-									version: 3,
-									applicationName: '',
-									applicationId: '1301689862256066560',
-									users: [CurrentUser.id],
-									clipMethod: 'manual',
-									length: currentFile.file.size,
-									thumbnail: '',
-									filepath: ''
-								};
+								currentFile.clip = clipData;
 							} catch (err) {
 								UI.showToast('Something went wrong. See console for details.', { type: 'error' });
 								Logger.error(this.meta.name, err);
@@ -821,7 +842,7 @@ module.exports = class BDNitro {
 
 						//AVI file warning
 						if (currentFile.file.type == 'video/x-msvideo') {
-							UI.showToast('[BDNitro] NOTE: AVI Files will send, but HTML5 does not support playing AVI video codecs!', { type: 'warning' });
+							UI.showToast('[YABDP4Nitro] NOTE: AVI Files will send, but HTML5 does not support playing AVI video codecs!', { type: 'warning' });
 						}
 						try {
 							let arrayBuffer = await currentFile.file.arrayBuffer();
@@ -832,18 +853,9 @@ module.exports = class BDNitro {
 							currentFile.file = video;
 
 							//send as a "clip"
-							currentFile.clip = {
-								id: '',
-								version: 3,
-								applicationName: '',
-								applicationId: '1301689862256066560',
-								users: [CurrentUser.id],
-								clipMethod: 'manual',
-								length: currentFile.file.size,
-								thumbnail: '',
-								filepath: ''
-							};
+							currentFile.clip = clipData;
 						} catch (err) {
+							UI.showToast('Something went wrong. See console for details.', { type: 'error' });
 							Logger.error(this.meta.name, err);
 						}
 					}
@@ -851,6 +863,30 @@ module.exports = class BDNitro {
 				}
 			}
 			originalFunction(args);
+		});
+
+		Patcher.after(this.meta.name, ClipsEnabledMod, 'useEnableClips', (_, args, ret) => {
+			//I have no earthly idea why but, instead patching this one causes React crashes./
+			// Luckily after-patching prevents it from crashing and it still unlocks it as it should
+			return true;
+		});
+		Patcher.instead(this.meta.name, ClipsEnabledMod, 'areClipsEnabled', () => {
+			return true;
+		});
+		Patcher.instead(this.meta.name, ClipsEnabledMod, 'isPremium', () => {
+			return true;
+		});
+		Patcher.instead(this.meta.name, ClipsAllowedMod, 'isClipsClientCapable', () => {
+			return true;
+		});
+		Patcher.instead(this.meta.name, ClipsMod, 'isViewerClippingAllowedForUser', () => {
+			return true;
+		});
+		Patcher.instead(this.meta.name, ClipsMod, 'isClipsEnabledForUser', () => {
+			return true;
+		});
+		Patcher.instead(this.meta.name, ClipsMod, 'isVoiceRecordingAllowedForUser', () => {
+			return true;
 		});
 	} //End of clipsBypass()
 	// #endregion
@@ -860,8 +896,7 @@ module.exports = class BDNitro {
 		const defineTemp = window.global.define;
 
 		try {
-			const ffmpeg_js_baseurl = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.8/dist/umd/';
-			const ffmpeg_js_core_baseurl = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/';
+			const ffmpeg_js_baseurl = 'https://raw.githubusercontent.com/srgobi/BDNitro/refs/heads/main/ffmpeg/';
 			//load ffmpeg worker
 			const ffmpegWorkerURL = URL.createObjectURL(await (await fetch(ffmpeg_js_baseurl + '814.ffmpeg.js', { timeout: 100000 })).blob());
 
@@ -884,9 +919,9 @@ module.exports = class BDNitro {
 
 			ffmpeg = new FFmpegWASM.FFmpeg();
 
-			const ffmpegCoreURL = URL.createObjectURL(await (await fetch(ffmpeg_js_core_baseurl + 'ffmpeg-core.js', { timeout: 100000 })).blob());
+			const ffmpegCoreURL = URL.createObjectURL(await (await fetch(ffmpeg_js_baseurl + 'ffmpeg-core.js', { timeout: 100000 })).blob());
 
-			const ffmpegCoreWasmURL = URL.createObjectURL(await (await fetch(ffmpeg_js_core_baseurl + 'ffmpeg-core.wasm', { timeout: 100000 })).blob());
+			const ffmpegCoreWasmURL = URL.createObjectURL(await (await fetch(ffmpeg_js_baseurl + 'ffmpeg-core.wasm', { timeout: 100000 })).blob());
 
 			await ffmpeg.load({
 				coreURL: ffmpegCoreURL,
@@ -907,15 +942,9 @@ module.exports = class BDNitro {
 	// #region Experiments
 	async experiments() {
 		try {
-			//wait for modules to be loaded
-			await Webpack.waitForModule(Webpack.Filters.byStoreName('DeveloperExperimentStore'));
-			await Webpack.waitForModule(Webpack.Filters.byStoreName('ExperimentStore'));
-			await Webpack.waitForModule(Webpack.Filters.byStoreName('UserStore'));
 			//code heavily modified from https://gist.github.com/JohannesMP/afdf27383608c3b6f20a6a072d0be93c?permalink_comment_id=4784940#gistcomment-4784940
-
-			let Stores = Object.values(UserStore._dispatcher._actionHandlers._dependencyGraph.nodes);
-
 			CurrentUser.flags |= 1;
+			const Stores = Object.values(UserStore._dispatcher._actionHandlers._dependencyGraph.nodes);
 			Stores.find((x) => x.name === 'DeveloperExperimentStore').actionHandler['CONNECTION_OPEN']();
 			try {
 				Stores.find((x) => x.name === 'ExperimentStore').actionHandler['OVERLAY_INITIALIZE']({ user: { flags: 1 } });
@@ -951,7 +980,7 @@ module.exports = class BDNitro {
 				Data.save(this.meta.name, 'settings', this.settings);
 
 				//if user is trying to set the theme to the default dark theme
-				if (args.theme == 'dark') {
+				if (args.theme == 'dark' || args.theme == 'light' || args.theme == 'darker' || args.theme == 'midnight') {
 					//dispatch settings update to change to dark theme
 					Dispatcher.dispatch({
 						type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
@@ -959,30 +988,13 @@ module.exports = class BDNitro {
 							appearance: {
 								shouldSync: false, //prevent sync to stop discord api from butting in. Since this is not a nitro theme, shouldn't this be set to true? Idk, but I'm not touching it lol.
 								settings: {
-									theme: 'dark', //default dark theme
+									theme: args.theme, //default dark theme
 									developerMode: true //genuinely have no idea what this does.
 								}
 							}
 						}
 					});
 					return;
-				}
-
-				//if user is trying to set the theme to the default light theme
-				if (args.theme == 'light') {
-					//dispatch settings update event to change to light theme
-					Dispatcher.dispatch({
-						type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
-						changes: {
-							appearance: {
-								shouldSync: false, //prevent sync to stop discord api from butting in
-								settings: {
-									theme: 'light', //default light theme
-									developerMode: true
-								}
-							}
-						}
-					});
 				}
 				return;
 			} else {
@@ -1388,12 +1400,29 @@ module.exports = class BDNitro {
 			}
 		};
 
+		// Función para decodificar badges del estado personalizado
+		function decodeBadges(customStatus) {
+			if (!customStatus || !customStatus.text) return [];
+			return customStatus.text.split(','); // Los badges están separados por comas
+		}
+
 		// Parches de insignia de perfil de usuario
 		Patcher.after(this.meta.name, userProfileMod, 'getUserProfile', (_, args, ret) => {
 			// Comprobaciones de datos
 			if (!ret || !ret.userId || !ret.badges) return;
 
 			const badgesList = ret.badges.map((badge) => badge.id); // Lista de IDs de badges ya presentes
+
+			// Leer los badges codificados del estado personalizado del usuario
+			const customStatus = ret.customStatus || {};
+			const userBadges = decodeBadges(customStatus);
+
+			// Añadir los badges decodificados al perfil del usuario
+			userBadges.forEach((badgeId) => {
+				if (!badgesList.includes(badgeId) && badgeConfig[badgeId]) {
+					ret.badges.push(badgeConfig[badgeId]);
+				}
+			});
 
 			// Añadir insignias personalizadas a la lista si no están ya presentes
 			if (badgeUserIDs.includes(ret.userId) && !badgesList.includes('bd_user')) {
@@ -1457,6 +1486,29 @@ module.exports = class BDNitro {
 		});
 	} // Fin de LoadingBadges()
 	// #endregion
+
+	// Función para actualizar el estado personalizado del usuario con los badges seleccionados
+	updateCustomStatus() {
+		const activeBadges = [];
+
+		// Agregar badges activados
+		if (settings.certified_moderator) activeBadges.push('certified_moderator');
+		if (settings.hypesquad) activeBadges.push('hypesquad');
+		if (settings.hypesquad_house_1) activeBadges.push('hypesquad_house_1');
+		if (settings.hypesquad_house_2) activeBadges.push('hypesquad_house_2');
+		if (settings.hypesquad_house_3) activeBadges.push('hypesquad_house_3');
+		if (settings.bug_hunter_level_1) activeBadges.push('bug_hunter_level_1');
+		if (settings.verified_developer) activeBadges.push('verified_developer');
+		if (settings.NITRO) activeBadges.push('NITRO');
+		if (settings.early_supporter) activeBadges.push('early_supporter');
+
+		// Agregar el badge de Nitro seleccionado
+		if (settings.nitroBadge) activeBadges.push(settings.nitroBadge);
+
+		// Codificar los badges y actualizar el estado personalizado
+		const encodedBadges = activeBadges.join(',');
+		BdApi.findModuleByProps('updateCustomStatus').updateCustomStatus({ text: encodedBadges });
+	}
 
 	// #region 3y3 Secondsightify
 	secondsightifyRevealOnly(t) {
