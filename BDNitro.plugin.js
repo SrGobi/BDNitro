@@ -2317,7 +2317,7 @@ module.exports = class BDNitro {
 		}
 
 		// Parches de insignia de perfil de usuario
-		Patcher.after(this.meta.name, userProfileMod, 'getUserProfile', (_, args, ret) => {
+		Patcher.after(this.meta.name, UserProfileStore, 'getUserProfile', (_, args, ret) => {
 			// Comprobaciones de datos
 			if (!ret || !ret.userId || !ret.badges) return;
 
