@@ -2,7 +2,7 @@
  * @name BDNitro
  * @author SrGobi
  * @authorLink https://github.com/srgobi
- * @version 6.1.0
+ * @version 6.1.4
  * @invite cqrN3Eg
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
@@ -37,7 +37,7 @@
  *
  * BDNitro is a free BetterDiscord plugin that bypasses and unlocks Nitro-locked features in the Discord client.
  *
- * Copyright (c) 2025 SrGobi and contributors
+ * Copyright (c) 2025 srgobi and contributors
  *
  * Licensed under the Non-Profit Open Software License version 3.0 (NPOSL-3.0).
  * You may use, distribute, and modify this code under the terms of this license.
@@ -68,7 +68,6 @@ const StreamButtons = Webpack.getMangled('RESOLUTION_1080', {
 });
 const { ApplicationStreamFPS, ApplicationStreamFPSButtons, ApplicationStreamFPSButtonsWithSuffixLabel, ApplicationStreamResolutionButtons, ApplicationStreamResolutionButtonsWithSuffixLabel, ApplicationStreamResolutions } = StreamButtons;
 const CloudUploader = Webpack.getModule(Webpack.Filters.byPrototypeKeys('uploadFileToCloud'), { searchExports: true });
-const Uploader = Webpack.getByKeys('uploadFiles', 'cancel');
 const UserStore = Webpack.getStore('UserStore');
 const CurrentUser = UserStore.getCurrentUser();
 const ORIGINAL_NITRO_STATUS = CurrentUser.premiumType;
@@ -141,7 +140,7 @@ const MaxFileSizeMod = Webpack.getMangled('.premiumTier].limits.fileSize:', {
 const InvalidStreamSettingsModal = Webpack.getMangled(/\.preset\)&&.{1,3}?===.{1,3}?resolution&&/, {
 	areStreamSettingsAllowed: (x) => x
 });
-const GoLiveModalV2UpsellMod = BdApi.Webpack.getMangled('onNitroClick:function', {
+const GoLiveModalV2UpsellMod = Webpack.getMangled('onNitroClick:function', {
 	GoLiveModalV2Upsell: (x) => x == x
 });
 const fs = require('fs');
@@ -209,13 +208,12 @@ const defaultSettings = {
 };
 const defaultData = {
 	avatarDecorations: {},
-	nameplates: {}
+	nameplatesV2: {}
 };
 
 //Plugin-wide variables
 let settings = {};
 let data = {};
-let usrBgUsers = [];
 let badgeUserIDs = [];
 let fetchedUserBg = false;
 let fetchedUserPfp = false;
@@ -226,27 +224,20 @@ const config = {
 		name: 'BDNitro',
 		authors: [
 			{
-				name: 'SrGobi',
-				discord_id: '360881334647914506',
+				name: 'srgobi',
+				discord_id: '359063827091816448',
 				github_username: 'srgobi'
 			}
 		],
-		version: '6.1.0',
+		version: '6.1.4',
 		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '6.1.0',
-			items: [
-				'Added Fake Nameplates bypass using 3y3 encoding.',
-				'Migrated avatar decoration data out of the config file and into a new BDNitro.data.json file. Nameplate data will also be stored there.',
-				'Removed "Cancel" button on modals where it doesn\'t make sense to have one.',
-				'Fixed an issue that was causing the UI for Fake Profile Colors to copy random colors in the Nitro version of the Profile Customization screen.',
-				'Changed some module filters to use getStore if the module was actually a data store and renamed their variables to reflect that. Overall should be faster and clearer.',
-				'Slightly reduced amount of repeated code.'
-			]
+			title: '6.1.4',
+			items: ['Fixed Fake Profile Themes Copy 3y3 Button not appearing due to a typo.', 'Fixed regression causing Fake Profile Themes colors to not be copied in certain scenarios.']
 		}
 	],
 	settingsPanel: [
@@ -503,6 +494,9 @@ module.exports = class BDNitro {
 			}
 		}
 
+		//delete old nameplate data
+		if (data.nameplates) delete data.nameplates;
+
 		Data.save(this.meta.name, 'settings', settings);
 		this.saveDataFile();
 
@@ -728,7 +722,7 @@ module.exports = class BDNitro {
 			}
 		}
 
-		if (settings.soundmojiEnabled || (settings.emojiBypass && settings.emojiBypassType == 0)) {
+		if (settings.soundmojiEnabled || (settings.emojiBypass && settings.emojiBypassType == 0) || settings.stickerBypass) {
 			try {
 				this._sendMessageInsteadPatch();
 			} catch (err) {
@@ -763,6 +757,10 @@ module.exports = class BDNitro {
 	} //End of saveAndUpdate()
 	// #endregion
 
+	//shouldInclude is a string containing the characters that the encoded text should contain
+	//that means that in order to check for "P{" for example, you check for the characters \uDB40\uDC50\uDB40\uDC7B since we're checking the encoded text
+	//but since the encoded text is over 2 bytes, you need to use the surrogate pairs ( you can calculate them here https://russellcottrell.com/greek/utilities/SurrogatePairCalculator.htm )
+	//if shouldInclude is blank, always return the revealed text if there is revealed text
 	getRevealedText(userId, shouldInclude = '') {
 		let revealedText = ''; //init variable
 
@@ -772,11 +770,11 @@ module.exports = class BDNitro {
 		if (userProfile) {
 			//if their bio is empty, move on to the next check.
 			if (userProfile?.bio != undefined) {
-				//reveal 3y3 encoded text
-				revealedText = this.secondsightifyRevealOnly(String(userProfile.bio));
-				//if there's no 3y3 text, move on to the next check.
-				if (revealedText != undefined && revealedText != '') {
-					if (revealedText.includes(shouldInclude)) {
+				if (userProfile.bio.includes(shouldInclude)) {
+					//reveal 3y3 encoded text
+					revealedText = this.secondsightifyRevealOnly(String(userProfile.bio));
+					//if there's no 3y3 text, move on to the next check.
+					if (revealedText != undefined && revealedText != '') {
 						//return bio with the 3y3 decoded
 						return revealedText;
 					}
@@ -792,9 +790,9 @@ module.exports = class BDNitro {
 			//if something has gone horribly wrong, stop processing.
 			if (customStatus == undefined) return;
 			//reveal 3y3 encoded text
-			revealedText = this.secondsightifyRevealOnly(String(customStatus));
-			//return custom status with the 3y3 decoded
-			if (revealedText?.includes(shouldInclude)) {
+			if (customStatus.includes(shouldInclude)) {
+				revealedText = this.secondsightifyRevealOnly(String(customStatus));
+				//return custom status with the 3y3 decoded
 				return revealedText;
 			}
 		}
@@ -811,16 +809,16 @@ module.exports = class BDNitro {
 			//if user has a nameplate
 			if (userNameplate) {
 				//filter out bad or existing nameplate
-				if (userNameplate.sku_id != 0 && userNameplate.sku_id != undefined && userNameplate.sku_id != null && data.nameplates[userNameplate.skuId] == undefined) {
+				if (userNameplate.sku_id != 0 && userNameplate.sku_id != undefined && userNameplate.sku_id != null && data.nameplatesV2[userNameplate.skuId] == undefined) {
 					//get shortened asset name
-					let nameplateAsset = userNameplate.asset.replaceAll('nameplates/', '').replaceAll('/', '');
+					let nameplateAsset = userNameplate.asset.replace('nameplates/', '').replaceAll('/', '');
 					//create name for nameplate since it's not provided through getUser
 					let nameplateName = nameplateAsset.replaceAll('_', ' '); //replace _ with space
 					nameplateName = nameplateName.replace(/(^\w|\s\w)/g, (m) => m.toUpperCase()); //make every word start with uppercase letter
 
 					//store seen nameplate
-					data.nameplates[userNameplate.sku_id] = {
-						asset: nameplateAsset,
+					data.nameplatesV2[userNameplate.sku_id] = {
+						asset: userNameplate.asset.replace('nameplates/', ''),
 						palette: userNameplate.palette,
 						name: nameplateName
 					};
@@ -828,8 +826,8 @@ module.exports = class BDNitro {
 			}
 
 			//Nameplate decoding
-
-			let revealedText = this.getRevealedText(userId, 'n{');
+			// check if it includes /n encoded
+			let revealedText = this.getRevealedText(userId, `\uDB40\uDC6E\uDB40\uDC7B`);
 
 			//if nothing's returned, or an empty string is returned, stop processing.
 			if (revealedText == undefined) return;
@@ -848,11 +846,11 @@ module.exports = class BDNitro {
 			//slice off the n{ and the ending }
 			let nameplate = firstMatch.slice(2, -1);
 			if (nameplate) {
-				let [asset, palette] = nameplate.split('/');
+				let [asset, palette] = nameplate.split(',');
 				if (asset != undefined && palette != undefined) {
 					if (ret.collectibles == undefined) ret.collectibles = {};
 					ret.collectibles.nameplate = {
-						asset: `nameplates/nameplates/${asset}/`,
+						asset: `nameplates/${asset}`,
 						palette,
 						sku_id: 0
 					};
@@ -868,7 +866,7 @@ module.exports = class BDNitro {
 
 			let nameplatesList = [];
 
-			if (!data?.nameplates || data?.nameplates?.length < 1) {
+			if (!data?.nameplatesV2 || data?.nameplatesV2?.length < 1) {
 				return React.createElement('h1', {
 					children: 'No nameplates were found!',
 					style: {
@@ -877,10 +875,10 @@ module.exports = class BDNitro {
 					}
 				});
 			} else {
-				const listOfNameplatesBySku = Object.keys(data.nameplates);
+				const listOfNameplatesBySku = Object.keys(data.nameplatesV2);
 				for (let i = 0; i < listOfNameplatesBySku.length; i++) {
 					let sku = listOfNameplatesBySku[i];
-					let nameplate = data.nameplates[sku];
+					let nameplate = data.nameplatesV2[sku];
 					if (query != '' && !nameplate.name.toLowerCase().includes(query.toLowerCase())) {
 						continue;
 					}
@@ -892,7 +890,7 @@ module.exports = class BDNitro {
 								isHighlighted: true,
 								nameplateData: {
 									imgAlt: nameplate.name,
-									src: `nameplates/nameplates/${nameplate.asset}/`,
+									src: `nameplates/${nameplate.asset}`,
 									palette: NameplatePalettes[nameplate.palette]
 								}
 							}),
@@ -909,7 +907,7 @@ module.exports = class BDNitro {
 							},
 							onClick: () => {
 								//make 3y3 string
-								let strToEncode = `n{${nameplate.asset}/${nameplate.palette}}`;
+								let strToEncode = `n{${nameplate.asset},${nameplate.palette}}`;
 								let encodedStr = secondsightifyEncodeOnly(strToEncode);
 
 								//copy to clipboard
@@ -2000,9 +1998,8 @@ module.exports = class BDNitro {
 					return this.userPfps[user.id];
 				}
 			}
-			//get revealed text
-
-			let revealedText = this.getRevealedText(user.id, 'P{');
+			//get revealed text                               includes P{ encoded
+			let revealedText = this.getRevealedText(user.id, `\uDB40\uDC50\uDB40\uDC7B`);
 			//if there is no 3y3 encoded text, return original function.
 			if (revealedText == undefined) return originalFunction(userId, size, shouldAnimate);
 
@@ -2137,7 +2134,7 @@ module.exports = class BDNitro {
 							}
 							if (stringToEncode == '') {
 								UI.showToast("An error occurred: couldn't find file name.", { type: 'error', forceShow: true });
-								Logger.error('BDNitro', "Couldn't find file name for some reason when grabbing Imgur URL for Custom PFP. Contact SrGobi!");
+								Logger.error('BDNitro', "Couldn't find file name for some reason when grabbing Imgur URL for Custom PFP. Contact srgobi!");
 							}
 
 							//add starting "P{" , remove "imgur.com/" , and add ending "}"
@@ -2419,6 +2416,28 @@ module.exports = class BDNitro {
 	}
 	// #endregion
 
+	// #region 3y3 Secondsightify
+	secondsightifyRevealOnly(t) {
+		if ([...t].some((x) => 0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f)) {
+			// 3y3 text detected. Revealing...
+			return ((t) => [...t].map((x) => (0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f ? String.fromCodePoint(x.codePointAt(0) - 0xe0000) : x)).join(''))(t);
+		} else {
+			// no encoded text found, returning
+			return;
+		}
+	}
+
+	secondsightifyEncodeOnly(t) {
+		if ([...t].some((x) => 0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f)) {
+			// 3y3 text detected. returning...
+			return;
+		} else {
+			// no 3y3 text detected. encoding...
+			return ((t) => [...t].map((x) => (0x00 < x.codePointAt(0) && x.codePointAt(0) < 0x7f ? String.fromCodePoint(x.codePointAt(0) + 0xe0000) : x)).join(''))(t);
+		}
+	}
+	// #endregion
+
 	// #region Profile Effects
 	//Everything related to Fake Profile Effects.
 	async profileFX(secondsightifyEncodeOnly) {
@@ -2446,31 +2465,34 @@ module.exports = class BDNitro {
 			if (ret == undefined) return;
 			if (ret.bio == undefined) return;
 
-			//reveal 3y3 encoded text. this string will also include the rest of the bio
-			let revealedText = this.secondsightifyRevealOnly(ret.bio);
-			if (revealedText == undefined) return;
+			//if bio includes encoded /fx
+			if (ret.bio.includes(`\uDB40\uDC2F\uDB40\uDC66\uDB40\uDC78`)) {
+				//reveal 3y3 encoded text. this string will also include the rest of the bio
+				let revealedText = this.secondsightifyRevealOnly(ret.bio);
+				if (revealedText == undefined) return;
 
-			//if profile effect 3y3 is detected
-			if (revealedText.includes('/fx')) {
-				const regex = /\/fx\d+/;
-				let matches = revealedText.toString().match(regex);
-				if (matches == undefined) return;
-				let firstMatch = matches[0];
-				if (firstMatch == undefined) return;
+				//if profile effect 3y3 is detected
+				if (revealedText.includes('/fx')) {
+					const regex = /\/fx\d+/;
+					let matches = revealedText.toString().match(regex);
+					if (matches == undefined) return;
+					let firstMatch = matches[0];
+					if (firstMatch == undefined) return;
 
-				//slice the /fx and only take the number after it.
-				let effectIndex = parseInt(firstMatch.slice(3));
-				//ignore invalid data
-				if (isNaN(effectIndex)) return;
-				//ignore if the profile effect id does not point to an actual profile effect
-				if (profileEffectIdList[effectIndex] == undefined) return;
-				//set the profile effect. stringify it.
-				ret.profileEffectId = profileEffectIdList[effectIndex] + '';
+					//slice the /fx and only take the number after it.
+					let effectIndex = parseInt(firstMatch.slice(3));
+					//ignore invalid data
+					if (isNaN(effectIndex)) return;
+					//ignore if the profile effect id does not point to an actual profile effect
+					if (profileEffectIdList[effectIndex] == undefined) return;
+					//set the profile effect. stringify it.
+					ret.profileEffectId = profileEffectIdList[effectIndex] + '';
 
-				//if for some reason we dont know what this user's ID is, stop here
-				if (args == undefined) return;
-				//otherwise add them to the list of users who show up with the BDNitro user badge
-				if (!badgeUserIDs.includes(args)) badgeUserIDs.push(args);
+					//if for some reason we dont know what this user's ID is, stop here
+					if (args == undefined) return;
+					//otherwise add them to the list of users who show up with the BDNitro user badge
+					if (!badgeUserIDs.includes(args)) badgeUserIDs.push(args);
+				}
 			}
 		}); //end of getUserProfile patch.
 
@@ -2522,7 +2544,7 @@ module.exports = class BDNitro {
 
 					profileEffectChildren.push(
 						React.createElement('img', {
-							className: 'riolubruhsSecretStuff',
+							className: 'srgobisSecretStuff',
 							onClick: copyDecoration3y3,
 							src: previewURL,
 							title,
@@ -2615,9 +2637,9 @@ module.exports = class BDNitro {
 					product.items.forEach((item) => {
 						if (item.asset) {
 							//store nameplates
-							if (item.asset.startsWith('nameplates/nameplates/')) {
-								data.nameplates[item.skuId] = {
-									asset: item.asset.replaceAll('nameplates/', '').replaceAll('/', ''),
+							if (item.asset.startsWith('nameplates')) {
+								data.nameplatesV2[item.skuId] = {
+									asset: item.asset.replace('nameplates/', ''),
 									palette: item.palette,
 									name: product.name
 								};
@@ -2661,7 +2683,8 @@ module.exports = class BDNitro {
 				}
 			}
 
-			let revealedText = this.getRevealedText(args[0], '/a');
+			//                                      includes /a encoded?
+			let revealedText = this.getRevealedText(args[0], `\uDB40\uDC2F\uDB40\uDC61`);
 			//if nothing's returned, or an empty string is returned, stop processing.
 			if (revealedText == undefined) return;
 			if (revealedText == '') return;
@@ -2803,13 +2826,14 @@ module.exports = class BDNitro {
 	// #endregion
 
 	//#region Emote Uploader
-	async UploadEmote(url, channelIdLmao, msg, emoji, runs) {
+	async UploadEmote(url, channelIdLmao, msg, emoji, runs, send) {
+		if (!msg[2].attachmentsToUpload) msg[2].attachmentsToUpload = [];
 		if (emoji === undefined) {
-			let emoji;
+			let emoji = { animated: true, name: 'default' };
 		}
 
 		if (msg === undefined) {
-			let msg;
+			let msg = [channelIdLmao, { content: '' }, []];
 		}
 
 		let extension = '.gif';
@@ -2831,25 +2855,22 @@ module.exports = class BDNitro {
 		let fileUp = new CloudUploader({ file: file, isClip: false, isThumbnail: false, platform: 1 }, channelIdLmao, false, 0);
 		fileUp.isImage = true;
 
-		//Options for the upload
-		let uploadOptions = new Object();
-		uploadOptions.channelId = channelIdLmao; //Upload to current channel
-		uploadOptions.uploads = [fileUp]; //The file from before
-		uploadOptions.draftType = 0; // Not sure what this does.
-		uploadOptions.options = {
-			stickerIds: [] //No stickers in the message
-		};
-		//Message attached to the upload.
-		uploadOptions.parsedMessage = { channelId: channelIdLmao, content: msg[1].content, tts: false, invalidEmojis: [] };
-
 		//if this is not the first emoji uploaded
-		if (runs > 1) {
+		if (runs >= 1) {
 			//make the message attached to the upload have no text
-			uploadOptions.parsedMessage = { channelId: channelIdLmao, content: '', tts: false, invalidEmojis: [] };
+			msg[1].content = '';
+			//clear nonce so this is sent as a new message
+			msg[2].nonce = '';
+			//clear list of attachments
+			msg[2].attachmentsToUpload = [];
 		}
 
 		try {
-			await Uploader.uploadFiles(uploadOptions); //finally finish the process of uploading
+			//add attachment
+			msg[2].attachmentsToUpload.unshift(fileUp);
+
+			//send and wait till its sent before moving on
+			await send.apply(undefined, msg);
 		} catch (err) {
 			Logger.error(this.meta.name, err);
 		}
@@ -2857,7 +2878,7 @@ module.exports = class BDNitro {
 	// #endregion
 
 	//#region Soundmoji Uploader
-	async UploadSoundmojis(ids, channelId, msg, sounds) {
+	async UploadSoundmojis(ids, channelId, msg, sounds, send) {
 		if (ids != undefined && channelId != undefined && msg != undefined) {
 			let files = [];
 			for (let i = 0; i < ids.length; i++) {
@@ -2870,17 +2891,9 @@ module.exports = class BDNitro {
 				files.push(fileUp);
 				fileUp.isAudio = true;
 			}
-			let uploadOptions = new Object();
-			uploadOptions.channelId = channelId;
-			uploadOptions.draftType = 0;
-			uploadOptions.options = {
-				stickerIds: []
-			};
 			if (files.length <= 10) {
-				uploadOptions.uploads = files;
-				uploadOptions.parsedMessage = { channelId, content: msg.content, tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
 				try {
-					await Uploader.uploadFiles(uploadOptions); //finally finish the process of uploading
+					send(channelId, msg, { attachmentsToUpload: files }); //finally finish the process of uploading
 				} catch (err) {
 					Logger.error(this.meta.name, err);
 				}
@@ -2889,11 +2902,10 @@ module.exports = class BDNitro {
 				let firstTime = true;
 				while (files.length) {
 					let tenFiles = files.splice(0, 10);
-					uploadOptions.uploads = tenFiles;
-					if (firstTime) uploadOptions.parsedMessage = { channelId, content: msg.content, tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
-					else uploadOptions.parsedMessage = { channelId, content: '', tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
+					// uploadOptions.uploads = tenFiles;
+					if (!firstTime) msg.content = '';
 					try {
-						await Uploader.uploadFiles(uploadOptions); //finally finish the process of uploading
+						send(channelId, msg, { attachmentsToUpload: tenFiles });
 					} catch (err) {
 						Logger.error(this.meta.name, err);
 					}
@@ -3078,7 +3090,7 @@ module.exports = class BDNitro {
 				if (emojis.length > 0) {
 					//upload all emotes
 					for (let i = 0; i < emojis.length; i++) {
-						await this.UploadEmote(emojiUrls[i], currentChannelId, msg, emojis[i], i);
+						await this.UploadEmote(emojiUrls[i], currentChannelId, msg, emojis[i], i, send);
 					}
 					//reset message content since we dont want a repeated message if soundmoji upload happens next
 					msg[1].content = '';
@@ -3086,7 +3098,33 @@ module.exports = class BDNitro {
 			}
 
 			if (settings.soundmojiEnabled) {
-				if (sounds.length > 0) await this.UploadSoundmojis(ids, channelId, msg[1], sounds);
+				if (sounds.length > 0) await this.UploadSoundmojis(ids, channelId, msg[1], sounds, send);
+			}
+
+			if (settings.stickerBypass) {
+				let stickerIds = msg[2]?.stickerIds;
+				let currentChannelId = SelectedChannelStore.getChannelId();
+				if (stickerIds) {
+					for (let i = 0; i < stickerIds.length; i++) {
+						let stickerId = stickerIds[i];
+						let stickerURL = 'https://media.discordapp.net/stickers/' + stickerId + '.png?size=4096&quality=lossless';
+						let msgtemp = [...msg];
+						msgtemp[2].stickerIds = [];
+						if (i > 0) msgtemp[1].content = '';
+
+						if (settings.uploadStickers) {
+							let emoji = new Object();
+							emoji.animated = false;
+							emoji.name = 'sticker';
+							this.UploadEmote(stickerURL, currentChannelId, msgtemp, emoji, 0, send);
+							return;
+						} else {
+							let messageContent = { content: stickerURL, tts: false, invalidEmojis: [], validNonShortcutEmojis: [] };
+							MessageActions.sendMessage(currentChannelId, messageContent, undefined, {});
+							return;
+						}
+					}
+				}
 			}
 
 			if (emojis.length == 0 && sounds.length == 0) {
@@ -3111,77 +3149,6 @@ module.exports = class BDNitro {
 		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'getEmojiUnavailableReason', () => {
 			return;
 		});
-
-		if (settings.emojiBypassType == 0) {
-			//#region uploadFiles Upload
-			Patcher.instead(this.meta.name, Uploader, 'uploadFiles', (_, [args], originalFunction) => {
-				if (document.getElementsByClassName('sdc-tooltip').length > 0) {
-					let SDC_Tooltip = document.getElementsByClassName('sdc-tooltip')[0];
-					if (SDC_Tooltip.innerHTML == 'Disable Encryption') {
-						//SDC Encryption Enabled
-						originalFunction(args);
-						return;
-					}
-				}
-				const currentChannelId = args.channelId;
-				let emojis = [];
-				let runs = 0;
-
-				if (args.parsedMessage.validNonShortcutEmojis != undefined) {
-					if (args.parsedMessage.validNonShortcutEmojis.length > 0) {
-						args.parsedMessage.validNonShortcutEmojis.forEach((emoji) => {
-							if (this.emojiBypassForValidEmoji(emoji, currentChannelId)) return; //Unlocked emoji. Skip.
-							if (emoji.type == 'UNICODE') return; //If this "emoji" is actually a unicode character, it doesn't count. Skip bypassing if so.
-							if (settings.PNGemote) {
-								emoji.forcePNG = true; //replace WEBP with PNG if the option is enabled.
-							}
-
-							let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
-							if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
-							if (emoji.animated) {
-								emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
-							}
-
-							//If there is a backslash (\) before the emote we are processing,
-							if (args.parsedMessage.content.includes('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>')) {
-								//remove the backslash
-								args.parsedMessage.content = args.parsedMessage.content.replace('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>', '<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>');
-								//and skip bypass for that emote
-								return;
-							}
-
-							//add to list of emojis
-							emojis.push(emoji);
-
-							//remove emote from message.
-							args.parsedMessage.content = args.parsedMessage.content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, '');
-						});
-
-						//send file with text and shit
-						originalFunction(args);
-
-						//loop through emotes to send one at a time. this has technically no delay so it may trigger anti-spam.
-						for (let i = 0; i < emojis.length; i++) {
-							let emoji = emojis[i];
-							let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
-							if (emoji.animated) {
-								emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
-							}
-
-							//remove existing URL parameters and add custom URL parameters for user's size preference. quality is always lossless.
-							emojiUrl = emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&`;
-
-							this.UploadEmote(emojiUrl, currentChannelId, [currentChannelId, { content: '', tts: false, invalidEmojis: [] }], emoji, 1);
-						}
-					} else {
-						originalFunction(args);
-					}
-				} else {
-					originalFunction(args);
-				}
-			});
-			//#endregion
-		}
 
 		//#region Ghost Mode Patch
 		//Ghost mode method
@@ -3238,13 +3205,6 @@ module.exports = class BDNitro {
 			Patcher.before(this.meta.name, MessageActions, 'sendMessage', (_, [currentChannelId, msg]) => {
 				ghostModeMethod(msg, currentChannelId, this);
 			});
-
-			//uploading file with emoji in the message in ghost mode.
-			Patcher.before(this.meta.name, Uploader, 'uploadFiles', (_, [args], originalFunction) => {
-				const currentChannelId = args.channelId;
-				const msg = args.parsedMessage;
-				ghostModeMethod(msg, currentChannelId, this);
-			});
 		}
 		//#endregion
 
@@ -3283,13 +3243,6 @@ module.exports = class BDNitro {
 
 			//sending message in classic mode
 			Patcher.before(this.meta.name, MessageActions, 'sendMessage', (_, [currentChannelId, msg]) => {
-				classicModeMethod(msg, currentChannelId, this);
-			});
-
-			//uploading file with emoji in the message in classic mode.
-			Patcher.before(this.meta.name, Uploader, 'uploadFiles', (_, [args], originalFunction) => {
-				const msg = args.parsedMessage;
-				const currentChannelId = args.channelId;
 				classicModeMethod(msg, currentChannelId, this);
 			});
 
@@ -3340,13 +3293,6 @@ module.exports = class BDNitro {
 
 			//sending message in vencord-like mode
 			Patcher.before(this.meta.name, MessageActions, 'sendMessage', (_, [currentChannelId, msg]) => {
-				vencordModeMethod(msg, currentChannelId, this);
-			});
-
-			//uploading file with emoji in the message in vencord-like mode.
-			Patcher.before(this.meta.name, Uploader, 'uploadFiles', (_, [args], originalFunction) => {
-				const msg = args.parsedMessage;
-				const currentChannelId = args.channelId;
 				vencordModeMethod(msg, currentChannelId, this);
 			});
 		}
@@ -3549,7 +3495,7 @@ module.exports = class BDNitro {
 				emoji.animated = false;
 				emoji.name = args[0];
 				let msg = [undefined, { content: '' }];
-				this.UploadEmote(stickerURL, currentChannelId, [undefined, { content: '' }], emoji);
+				this.UploadEmote(stickerURL, currentChannelId, msg, emoji, 1, send);
 				return;
 			}
 			if (!settings.uploadStickers) {
@@ -3604,7 +3550,7 @@ module.exports = class BDNitro {
 					onClick: () => {
 						let themeColors;
 						themeColors = UserSettingsAccountStore.getAllPending().pendingThemeColors;
-						if (!themeColors && (CurrentUser.premiumType == null || CurrentUser.premiumType == undefined) && !settings.removeProfileUpsell) themeColors = UserSettingsAccountStore.getAllTryItOut().tryItOutThemeColors;
+						if (!themeColors) themeColors = UserSettingsAccountStore.getAllTryItOut().tryItOutThemeColors;
 						if (!themeColors) {
 							UI.showToast('Nothing has been copied. Is the selected color identical to your current color?', { type: 'warning' });
 							return;
@@ -3638,7 +3584,7 @@ module.exports = class BDNitro {
 	//#region Banner Decoding
 	//Decode 3y3 from profile bio and apply fake banners.
 	bannerUrlDecoding() {
-		let endpoint, bucket, prefix, data;
+		let endpoint, bucket, prefix, usrBgData;
 
 		//if userBg integration is enabled, and we havent already downloaded & parsed userBg data,
 		if (settings.userBgIntegration && !fetchedUserBg) {
@@ -3648,11 +3594,10 @@ module.exports = class BDNitro {
 			//download, then store json
 			Net.fetch(userBgJsonUrl, { timeout: 100000 }).then((res) =>
 				res.json().then((res) => {
-					data = res;
+					usrBgData = res;
 					endpoint = res.endpoint;
 					bucket = res.bucket;
 					prefix = res.prefix;
-					usrBgUsers = Object.keys(res.users);
 					//mark db as fetched so we only fetch it once per load of the plugin
 					fetchedUserBg = true;
 				})
@@ -3676,51 +3621,53 @@ module.exports = class BDNitro {
 				//if we've fetched the userbg database
 				if (fetchedUserBg) {
 					//if user is in userBg database,
-					if (usrBgUsers.includes(user.userId)) {
+					if (usrBgData?.users[user.userId]) {
 						profile.banner = 'funky_kong_is_epic'; //set banner id to fake value
 						profile.premiumType = 2; //set this profile to appear with premium rendering
-						return `${endpoint}/${bucket}/${prefix}${user.userId}?${data?.users[user.userId]}`; //return userBg banner URL and exit.
+						return `${endpoint}/${bucket}/${prefix}${user.userId}?${usrBgData?.users[user.userId]}`; //return userBg banner URL and exit.
 					}
 				}
 			}
 
 			//do original function if we don't have the user's bio
 			if (profile.bio == undefined) return ogFunction(args);
+			//              includes /B encoded?
+			if (profile.bio.includes(`\uDB40\uDC42\uDB40\uDC7B`)) {
+				//reveal 3y3 encoded text, store as parsed
+				let parsed = this.secondsightifyRevealOnly(profile.bio);
+				//if there is no 3y3 encoded text, return original function
+				if (parsed == undefined) return ogFunction(args);
 
-			//reveal 3y3 encoded text, store as parsed
-			let parsed = this.secondsightifyRevealOnly(profile.bio);
-			//if there is no 3y3 encoded text, return original function
-			if (parsed == undefined) return ogFunction(args);
+				//This regex matches B{*} . Do not touch unless you know what you are doing.
+				let regex = /B\{[^}]*?\}/;
 
-			//This regex matches B{*} . Do not touch unless you know what you are doing.
-			let regex = /B\{[^}]*?\}/;
+				//find banner url in parsed bio
+				let matches = parsed.toString().match(regex);
 
-			//find banner url in parsed bio
-			let matches = parsed.toString().match(regex);
+				//if there's no matches, return original function
+				if (matches == undefined) return ogFunction(args);
+				if (matches == '') return ogFunction(args);
 
-			//if there's no matches, return original function
-			if (matches == undefined) return ogFunction(args);
-			if (matches == '') return ogFunction(args);
+				//if there is matched text, grab the first match, replace the starting "B{" and ending "}" to get the clean filename
+				let matchedText = matches[0].replace('B{', '').replace('}', '');
 
-			//if there is matched text, grab the first match, replace the starting "B{" and ending "}" to get the clean filename
-			let matchedText = matches[0].replace('B{', '').replace('}', '');
+				//Checking for file extension.
+				if (!String(matchedText).endsWith('.gif') && !String(matchedText).endsWith('.png') && !String(matchedText).endsWith('.jpg') && !String(matchedText).endsWith('.jpeg') && !String(matchedText).endsWith('.webp')) {
+					matchedText += '.gif'; //Fallback to a default file extension if one is not found.
+				}
 
-			//Checking for file extension.
-			if (!String(matchedText).endsWith('.gif') && !String(matchedText).endsWith('.png') && !String(matchedText).endsWith('.jpg') && !String(matchedText).endsWith('.jpeg') && !String(matchedText).endsWith('.webp')) {
-				matchedText += '.gif'; //Fallback to a default file extension if one is not found.
+				//set banner id to fake value
+				profile.banner = 'funky_kong_is_epic';
+
+				//set this profile to appear with premium rendering
+				profile.premiumType = 2;
+
+				//add this user to the list of users that show with the BDNitro user badge if we haven't aleady.
+				if (!badgeUserIDs.includes(user.userId)) badgeUserIDs.push(user.userId);
+
+				//return final banner URL.
+				return `https://i.imgur.com/${matchedText}`;
 			}
-
-			//set banner id to fake value
-			profile.banner = 'funky_kong_is_epic';
-
-			//set this profile to appear with premium rendering
-			profile.premiumType = 2;
-
-			//add this user to the list of users that show with the BDNitro user badge if we haven't aleady.
-			if (!badgeUserIDs.includes(user.userId)) badgeUserIDs.push(user.userId);
-
-			//return final banner URL.
-			return `https://i.imgur.com/${matchedText}`;
 		}); //End of patch for getBannerURL
 	} //End of bannerUrlDecoding()
 	//#endregion
@@ -3841,7 +3788,7 @@ module.exports = class BDNitro {
 							}
 							if (stringToEncode == '') {
 								UI.showToast("An error occurred: couldn't find file name.", { type: 'error', forceShow: true });
-								Logger.error('BDNitro', "Couldn't find file name when trying to grab Imgur URL for Profile Banner for some reason. Contact SrGobi.");
+								Logger.error('BDNitro', "Couldn't find file name when trying to grab Imgur URL for Profile Banner for some reason. Contact srgobi.");
 								return;
 							}
 							//add starting "B{" , remove "imgur.com/" , and add ending "}"
@@ -4071,7 +4018,6 @@ module.exports = class BDNitro {
 		Dispatcher.unsubscribe('COLLECTIBLES_CATEGORIES_FETCH_SUCCESS', this.storeProductsFromCategories);
 		DOM.removeStyle(this.meta.name);
 		DOM.removeStyle('BDNitroBadges');
-		usrBgUsers = [];
 
 		let ffmpegScript = document.getElementById('ffmpegScript');
 		if (ffmpegScript) {
