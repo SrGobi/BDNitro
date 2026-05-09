@@ -2,42 +2,23 @@
  * @name BDNitro
  * @author SrGobi
  * @authorLink https://github.com/srgobi
- * @version 6.1.4
- * @invite cqrN3Eg
+ * @version 6.8.18
+ * @invite HfFxUbgsBc
  * @source https://github.com/srgobi/BDNitro
  * @donate https://github.com/srgobi/BDNitro?tab=readme-ov-file#donate
- * @updateUrl https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js
+ * @updateUrl https://raw.githubusercontent.com/srgobi/BDNitro/refs/heads/main/BDNitro.plugin.js
  * @description Unlock all screensharing modes, use cross-server & GIF emotes, and more!
  */
 /*@cc_on
 @if(@_jscript)
-	
-    // Offer to self-install for clueless users that try to run this directly.
-    var shell = WScript.CreateObject("WScript.Shell");
-    var fs = new ActiveXObject("Scripting.FileSystemObject");
-    var pathPlugins = shell.ExpandEnvironmentStrings("%APPDATA%\\BetterDiscord\\plugins");
-    var pathSelf = WScript.ScriptFullName;
-    // Put the user at ease by addressing them in the first person
-    shell.Popup("It looks like you've mistakenly tried to run me directly. \n(Don't do that!)", 0, "I'm a plugin for BetterDiscord", 0x30);
-    if(fs.GetParentFolderName(pathSelf) === fs.GetAbsolutePathName(pathPlugins)){
-        shell.Popup("I'm in the correct folder already.", 0, "I'm already installed", 0x40);
-    }else if(!fs.FolderExists(pathPlugins)){
-        shell.Popup("I can't find the BetterDiscord plugins folder.\nAre you sure it's even installed?", 0, "Can't install myself", 0x10);
-    }else if(shell.Popup("Should I copy myself to BetterDiscord's plugins folder for you?", 0, "Do you need some help?", 0x34) === 6){
-        fs.CopyFile(pathSelf, fs.BuildPath(pathPlugins, fs.GetFileName(pathSelf)), true);
-        // Show the user where to put plugins in the future
-        shell.Exec("explorer " + pathPlugins);
-        shell.Popup("I'm installed!", 0, "Successfully installed", 0x40);
-    }
     WScript.Quit();
-
 @else@*/
 
 /*    ***** ATTRIBUTION NOTICE *****
  *
  * BDNitro is a free BetterDiscord plugin that bypasses and unlocks Nitro-locked features in the Discord client.
  *
- * Copyright (c) 2025 srgobi and contributors
+ * Copyright (c) 2026 srgobi and contributors
  *
  * Licensed under the Non-Profit Open Software License version 3.0 (NPOSL-3.0).
  * You may use, distribute, and modify this code under the terms of this license.
@@ -57,104 +38,193 @@
  */
 
 //#region Module Hell
-const { Webpack, Patcher, Net, React, UI, Logger, Data, Components, DOM, Plugins } = BdApi;
-const StreamButtons = Webpack.getMangled('RESOLUTION_1080', {
-	ApplicationStreamFPS: Webpack.Filters.byKeys('FPS_30'),
-	ApplicationStreamFPSButtons: (o) => Array.isArray(o) && typeof o[0]?.label === 'number' && o[0]?.value === 15,
-	ApplicationStreamFPSButtonsWithSuffixLabel: (o) => Array.isArray(o) && typeof o[0]?.label === 'string' && o[0]?.value === 15,
-	ApplicationStreamResolutionButtons: (o) => Array.isArray(o) && o[0]?.value !== undefined,
-	ApplicationStreamResolutionButtonsWithSuffixLabel: (o) => Array.isArray(o) && o[0]?.label === '480p',
-	ApplicationStreamResolutions: Webpack.Filters.byKeys('RESOLUTION_1080')
-});
-const { ApplicationStreamFPS, ApplicationStreamFPSButtons, ApplicationStreamFPSButtonsWithSuffixLabel, ApplicationStreamResolutionButtons, ApplicationStreamResolutionButtonsWithSuffixLabel, ApplicationStreamResolutions } = StreamButtons;
-const CloudUploader = Webpack.getModule(Webpack.Filters.byPrototypeKeys('uploadFileToCloud'), { searchExports: true });
-const UserStore = Webpack.getStore('UserStore');
-const CurrentUser = UserStore.getCurrentUser();
-const ORIGINAL_NITRO_STATUS = CurrentUser.premiumType;
-const getBannerURL = Webpack.getByPrototypeKeys('getBannerURL').prototype;
-const UserProfileStore = Webpack.getStore('UserProfileStore');
-const buttonClassModule = Webpack.getByKeys('lookFilled', 'button', 'contents');
-const Dispatcher = Webpack.getByKeys('subscribe', 'dispatch');
-const canUserUseMod = Webpack.getMangled('.getFeatureValue(', {
-	canUserUse: Webpack.Filters.byStrings('getFeatureValue')
-});
-const AvatarDefaults = Webpack.getByKeys('getEmojiURL');
-const LadderModule = Webpack.getModule(Webpack.Filters.byKeys('calculateLadder'), { searchExports: true });
-const FetchCollectibleCategories = Webpack.getByStrings('{type:"COLLECTIBLES_CATEGORIES_FETCH"', { searchExports: true });
-let ffmpeg = undefined;
-const udta = new Uint8Array([
-	0, 0, 0, 89, 109, 101, 116, 97, 0, 0, 0, 0, 0, 0, 0, 33, 104, 100, 108, 114, 0, 0, 0, 0, 0, 0, 0, 0, 109, 100, 105, 114, 97, 112, 112, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 105, 108, 115, 116, 0, 0, 0, 36, 169, 116, 111, 111, 0, 0, 0, 28, 100, 97, 116, 97, 0, 0, 0, 1, 0, 0, 0, 0, 76, 97, 118, 102, 54, 49, 46, 51, 46, 49, 48, 51, 0, 0, 46, 46, 117, 117, 105, 100, 161, 200, 82, 153, 51, 70, 77, 184, 136, 240,
-	131, 245, 122, 117, 165, 239
-]);
-const udtaBuffer = udta.buffer;
-const PresenceStore = Webpack.getStore('PresenceStore');
-const SelectedGuildStore = Webpack.getStore('SelectedGuildStore');
-const ChannelStore = Webpack.getStore('ChannelStore');
-const MessageActions = Webpack.getByKeys('jumpToMessage', '_sendMessage');
-const SelectedChannelStore = Webpack.getStore('SelectedChannelStore');
-const MessageEmojiReact = Webpack.getByStrings(',nudgeAlignIntoViewport:!0,position:', 'jumboable?', { searchExports: true });
-const renderEmbedsMod = Webpack.getByPrototypeKeys('renderSocialProofingFileSizeNitroUpsell', { searchExports: true }).prototype;
-const messageRender = Webpack.getMangled('.SEND_FAILED,', {
-	renderMessage: (o) => typeof o === 'object'
-});
-const stickerSendabilityModule = Webpack.getMangled('SENDABLE_WITH_BOOSTED_GUILD', {
-	getStickerSendability: Webpack.Filters.byStrings('canUseCustomStickersEverywhere'),
-	isSendableSticker: Webpack.Filters.byStrings(')=>0===')
-});
-const clientThemesModule = Webpack.getModule(Webpack.Filters.byKeys('isPreview'));
-const streamSettingsMod = Webpack.getByPrototypeKeys('getCodecOptions').prototype;
-const themesModule = Webpack.getMangled('changes:{appearance:{settings:{clientThemeSettings:{', {
-	saveClientTheme: Webpack.Filters.byStrings('changes:{appearance:{settings:{clientThemeSettings:{')
-});
-const accountSwitchModule = Webpack.getByKeys('startSession', 'login');
-const getAvatarUrlModule = Webpack.getByPrototypeKeys('getAvatarURL').prototype;
-const fetchProfileEffects = Webpack.getByStrings('USER_PROFILE_EFFECTS_FETCH', { searchExports: true });
-const SoundboardStore = Webpack.getStore('SoundboardStore');
-const EmojiStore = Webpack.getStore('EmojiStore');
-const isEmojiAvailableMod = Webpack.getByKeys('isEmojiFilteredOrLocked');
-const TextClasses = Webpack.getByKeys('errorMessage', 'h5');
-const videoOptionFunctions = Webpack.getByPrototypeKeys('updateVideoQuality').prototype;
-const appIconButtonsModule = Webpack.getMangled(/isEditor:.{1,3},renderCTAButtons/, {
-	CTAButtons: (x) => x
-});
-const addFilesMod = Webpack.getByKeys('addFiles');
-const AppIcon = Webpack.getMangled('AppIconHome', {
-	AppIconHome: (x) => x
-});
-const RegularAppIcon = Webpack.getByStrings('M19.73 4.87a18.2', { searchExports: true });
-const CurrentDesktopIcon = Webpack.getStore('AppIconPersistedStoreState');
-const CustomAppIcon = Webpack.getByStrings('.iconSource,width:');
-const ClipsEnabledMod = Webpack.getMangled('useExperiment({location:"useEnableClips"', {
-	useEnableClips: Webpack.Filters.byStrings('useExperiment({location:"useEnableClips"'),
-	areClipsEnabled: Webpack.Filters.byStrings('areClipsEnabled'),
-	isPremium: Webpack.Filters.byStrings('isPremiumAtLeast')
-});
-const ClipsAllowedMod = Webpack.getMangled(`let{ignorePlatformRestriction:`, {
-	isClipsClientCapable: (x) => x == x //just get the first result lol
-});
-const ClipsStore = Webpack.getStore('ClipsStore');
-const MaxFileSizeMod = Webpack.getMangled('.premiumTier].limits.fileSize:', {
-	getMaxFileSize: Webpack.Filters.byStrings('.premiumTier].limits.fileSize:'),
-	exceedsMessageSizeLimit: Webpack.Filters.byStrings('Array.from(', '.size>')
-});
-const InvalidStreamSettingsModal = Webpack.getMangled(/\.preset\)&&.{1,3}?===.{1,3}?resolution&&/, {
-	areStreamSettingsAllowed: (x) => x
-});
-const GoLiveModalV2UpsellMod = Webpack.getMangled('onNitroClick:function', {
-	GoLiveModalV2Upsell: (x) => x == x
-});
+const { Webpack, Patcher, Net, React, UI, Logger, Data, Components, DOM, Plugins, ContextMenu, ReactUtils, Utils } = new BdApi('BDNitro');
+
+const {
+	UserStore,
+	UserProfileStore,
+	PresenceStore,
+	SelectedGuildStore,
+	ChannelStore,
+	SelectedChannelStore,
+	SoundboardStore,
+	EmojiStore,
+	AppIconPersistedStoreState,
+	ClipsStore,
+	GuildChannelStore
+	// SavedMessagesStore,
+	// MessageStore
+} = Webpack.Stores;
+
+const [
+	ProfileBanner,
+	Dispatcher,
+	AvatarDefaults,
+	LadderModule,
+	FetchCollectibleCategories,
+	MessageActions,
+	MessageEmojiReact,
+	renderEmbedsMod,
+	clientThemesModule,
+	streamSettingsMod,
+	accountSwitchModule,
+	getAvatarUrlModule,
+	isEmojiAvailableMod,
+	videoOptionFunctions,
+	addFilesMod,
+	RegularAppIcon,
+	CustomAppIcon,
+	NameplatePreview,
+	CloudUploader,
+	InvalidStreamSettingsModal,
+	themesModule,
+	CanUserUseMod,
+	DMTag,
+	GIFPickerRender,
+	DiscordCopyToClipboardFn,
+	ContextMenuSlider,
+	PictureInPicturePlayer,
+	stickerSendabilityModule,
+	ClipsEnabledMod,
+	MaxFileSizeMod,
+	CustomThemesEditor,
+	UserSettingsModal,
+	CustomUserThemeState,
+	CustomUserPanelState,
+	UserContextMenuFunctions,
+	UserAvatar,
+	StreamButtons
+] = Webpack.getBulk(
+	{
+		filter: Webpack.Filters.bySource('pendingBanner', 'displayProfile', 'foreignObject'),
+		map: {
+			renderBanner: (x) => x?.toString?.()?.includes?.('canUsePremiumProfileCustomization')
+		}
+	},
+	{ filter: Webpack.Filters.byKeys('subscribe', 'dispatch'), searchExports: true },
+	{ filter: Webpack.Filters.byKeys('getEmojiURL') }, //AvatarDefaults
+	{ filter: Webpack.Filters.byKeys('calculateLadder'), searchExports: true },
+	{ filter: Webpack.Filters.byStrings('{type:"COLLECTIBLES_CATEGORIES_FETCH"'), searchExports: true },
+	{ filter: Webpack.Filters.byKeys('jumpToMessage', '_sendMessage') },
+	{ filter: Webpack.Filters.byStrings(',nudgeAlignIntoViewport:!0,position:', 'jumboable?'), searchExports: true }, //MessageEmojiReact
+	{
+		filter: Webpack.Filters.bySource('renderEmbeds', 'renderSuppressEmbeds'),
+		map: {
+			//renderEmbedsMod
+			renderEmbeds: (x) => x?.toString?.().includes?.('renderSuppressEmbeds')
+		}
+	},
+	{ filter: Webpack.Filters.byKeys('isPreview') }, //clientThemesModule
+	{
+		filter: Webpack.Filters.bySource('getCodecOptions'),
+		mapDeclarations: true,
+		map: {
+			Connection: (x) => x?.prototype?.getCodecOptions
+		}
+	}, //streamSettingsMod
+	{ filter: Webpack.Filters.byKeys('startSession', 'login') }, //accountSwitchModule
+	{ filter: Webpack.Filters.byPrototypeKeys('getAvatarURL') },
+	{ filter: Webpack.Filters.byKeys('isEmojiFilteredOrLocked') },
+	{ filter: Webpack.Filters.byPrototypeKeys('updateVideoQuality') },
+	{ filter: Webpack.Filters.byKeys('addFiles') },
+	{
+		filter: Webpack.Filters.bySource('M19.73 4.87a18.2'),
+		map: {
+			//RegularAppIcon
+			render: (x) => x
+		}
+	},
+	{ filter: Webpack.Filters.byStrings('.iconSource,width:') }, //CustomAppIcon
+	{ filter: Webpack.Filters.bySource('nameplateData', 'showPlaceholderUser', 'displayNameStyles') }, //NameplatePreview
+	{ filter: Webpack.Filters.byPrototypeKeys('uploadFileToCloud'), searchExports: true },
+	{ filter: Webpack.Filters.bySource('preset)&&', 'resolution&&', 'fps&&') }, //InvalidStreamSettingsModal
+	{ filter: Webpack.Filters.bySource('changes:{appearance:{settings:{clientThemeSettings:{'), defaultExport: false }, //themesModule
+	{ filter: Webpack.Filters.bySource('.getFeatureValue('), defaultExport: false }, //CanUserUseMod
+	{ filter: Webpack.Filters.bySource('NOT_STAFF_WARNING', 'isStaff', 'id.startsWith("staff")') }, //DMTag
+	{ filter: Webpack.Filters.byPrototypeKeys('renderGIF'), searchExports: true },
+	{ filter: Webpack.Filters.byStrings('await window.navigator.clipboard.writeText'), searchExports: true }, //DiscordCopyToClipboardFn
+	{ filter: Webpack.Filters.byStrings('initialValue', 'label', 'sortedMarkers'), searchExports: true },
+	{ filter: Webpack.Filters.bySource('backgroundKey', 'onForceIdle') }, //PictureInPicturePlayer
+	{
+		filter: Webpack.Filters.bySource('SENDABLE_WITH_BOOSTED_GUILD', 'canUseCustomStickersEverywhere'),
+		map: {
+			//stickerSendabilityModule
+			getStickerSendability: (x) => x.toString().includes('canUseCustomStickersEverywhere'),
+			isSendableSticker: (x) => x.toString().includes(')=>0===')
+		}
+	},
+	{
+		filter: Webpack.Filters.bySource('getConfig({location:"useEnableClips'),
+		map: {
+			//ClipsEnabledMod
+			useEnableClips: (x) => x.toString().includes('getConfig({location:"useEnableClips"'),
+			areClipsEnabled: (x) => x.toString().includes('areClipsEnabled')
+		}
+	},
+	{
+		filter: Webpack.Filters.bySource('getUserMaxFileSize', 'reType'),
+		map: {
+			//MaxFileSizeMod
+			getMaxFileSize: (x) => x.toString().includes('getUserMaxFileSize'),
+			exceedsMessageSizeLimit: (x) => x.toString().includes('Array.from(', '.size>')
+		}
+	},
+	{
+		filter: Webpack.Filters.bySource('onSaveTheme', 'CUSTOM_THEMES_EDITOR', 'CUSTOM_THEME_COACHMARK'),
+		map: {
+			//CustomThemesEditor
+			render: (x) => x
+		}
+	},
+	{ filter: Webpack.Filters.byKeys('openUserSettings') }, //UserSettingsModal
+	{
+		filter: Webpack.Filters.bySource('setColors', 'setChassisMixAmount', 'setGradientAngle', 'setAll', 'colors:[],'),
+		map: {
+			//CustomUserThemeState
+			state: (x) => x?.setState
+		}
+	},
+	{
+		filter: Webpack.Filters.bySource('CLIENT_THEMES_EDITOR', 'activePanel', 'SHARE_MESSAGE'),
+		map: {
+			state: (x) => x?.setState
+		}
+	},
+	{
+		filter: Webpack.Filters.bySource('isGroupDM', 'targetIsUser'),
+		map: {
+			openUserContextMenu: (x) => x?.toString?.().includes?.('targetIsUser', 'showMute')
+		}
+	},
+	{
+		filter: Webpack.Filters.bySource('avatarDecoration', 'foreignObject', 'onClick', 'statusColor', 'isMobile', 'isVR'),
+		map: {
+			render: (x) => x?.toString?.().includes?.('foreignObject')
+		}
+	},
+	{
+		filter: Webpack.Filters.bySource('Unknown frame rate:'),
+		map: {
+			ApplicationStreamFPS: (o) => o?.FPS_30,
+			ApplicationStreamFPSButtonsWithSuffixLabel: (o) => Array.isArray(o) && typeof o[0]?.label === 'string' && o[0]?.value === 15,
+			ApplicationStreamResolutionButtonsWithSuffixLabel: (o) => Array.isArray(o) && o[0]?.label === '480p',
+			ApplicationStreamResolutions: (o) => o?.RESOLUTION_1440
+		}
+	}
+);
+const { ApplicationStreamFPS, ApplicationStreamFPSButtonsWithSuffixLabel, ApplicationStreamResolutionButtonsWithSuffixLabel, ApplicationStreamResolutions } = StreamButtons;
+//#endregion
 const fs = require('fs');
 const path = require('path');
-const NameplateSectionMod = Webpack.getMangled(/\{pendingNameplate:.{1,3}?,pendingErrors:.{1,3}?\}=\(/, {
-	NameplateSection: (x) => x
-});
-const UserSettingsAccountStore = Webpack.getStore('UserSettingsAccountStore');
-const NameplatePalettes = Webpack.getBySource('Crimson', 'darkBackground', 'lightBackground', { searchExports: true });
-const NameplatePreview = Webpack.getByRegex(/user:.{1,3}?,nameplate:.{1,3}?,nameplateData:/);
-//#endregion
+let CurrentUser = UserStore?.getCurrentUser();
+const ORIGINAL_NITRO_STATUS = CurrentUser?.premiumType;
+const nodePatcher = ReactUtils.createNodePatcher();
 
-// Calc CRC32 Table
-const crcTable = Array.from({ length: 256 }, (_, i) => Array.from({ length: 8 }, (_, j) => j).reduce((crc) => (crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1), i));
+//clips related variables
+let ffmpeg, udta, udtaBuffer, crcTable, clipMaBuffer;
+
+//for fixing edit cancels
+let lastEditedMsg, lastEditedMsgCopy;
 
 const defaultSettings = {
 	emojiSize: 64,
@@ -177,7 +247,7 @@ const defaultSettings = {
 	stickerBypass: false,
 	profileV2: false,
 	forceStickersUnlocked: false,
-	changePremiumType: false,
+	changePremiumType2: -1,
 	videoCodec2: -1,
 	clientThemes: true,
 	lastGradientSettingStore: -1,
@@ -186,7 +256,7 @@ const defaultSettings = {
 	removeScreenshareUpsell: true,
 	fakeProfileBanners: true,
 	fakeAvatarDecorations: true,
-	unlockAppIcons: false,
+	unlockAppIcons: true,
 	profileEffects: true,
 	killProfileEffects: false,
 	customPFPs: true,
@@ -194,22 +264,35 @@ const defaultSettings = {
 	userPfpIntegration: true,
 	userBgIntegration: true,
 	useClipBypass: true,
-	alwaysTransmuxClips: false,
 	forceClip: false,
 	checkForUpdates: true,
 	fakeInlineVencordEmotes: true,
-	soundmojiEnabled: true,
+	soundmojiEnabled: false,
 	useAudioClipBypass: true,
 	forceAudioClip: false,
 	zipClip: true,
-	enableClipsExperiment: true,
+	enableClipsExperiment: false,
 	disableUserBadge: false,
-	nameplatesEnabled: true
+	nameplatesEnabled: true,
+	clipTimestamp: 2,
+	removeNotStaffWarning: true,
+	editMessageWithEmoji: true,
+	extraContextMenus: true,
+	userSharpenPreferences: {},
+	sharpenStreams: false,
+	displayNameStyles: true,
+	customUserThemeSettings: {
+		custom: false,
+		theme: 'dark'
+	},
+	appIcon: 'AppIcon'
 };
 const defaultData = {
 	avatarDecorations: {},
 	nameplatesV2: {}
 };
+
+let controller = new AbortController();
 
 //Plugin-wide variables
 let settings = {};
@@ -217,6 +300,7 @@ let data = {};
 let badgeUserIDs = [];
 let fetchedUserBg = false;
 let fetchedUserPfp = false;
+let profileEffects = {};
 
 // #region Config
 const config = {
@@ -224,20 +308,20 @@ const config = {
 		name: 'BDNitro',
 		authors: [
 			{
-				name: 'srgobi',
-				discord_id: '359063827091816448',
+				name: 'SrGobi',
+				discord_id: '360881334647914506',
 				github_username: 'srgobi'
 			}
 		],
-		version: '6.1.4',
-		description: 'Unlock all screensharing modes, and use cross-server & GIF emotes!',
+		version: '6.8.18',
+		description: '¡Desbloquea todos los modos de compartir pantalla, usa emoticonos entre servidores y GIF, y mucho más!',
 		github: 'https://github.com/srgobi/BDNitro',
 		github_raw: 'https://raw.githubusercontent.com/srgobi/BDNitro/main/BDNitro.plugin.js'
 	},
 	changelog: [
 		{
-			title: '6.1.4',
-			items: ['Fixed Fake Profile Themes Copy 3y3 Button not appearing due to a typo.', 'Fixed regression causing Fake Profile Themes colors to not be copied in certain scenarios.']
+			title: '6.8.18',
+			elementos: ['Corregir el problema por el que Soundmoji no aplica la anulación del experimento desde que Discord lo movió al nuevo sistema "Apex Experiments".', "Corregir el error 'this.encodeProfileColors no es una función' que aparece en la consola.", 'Agregar más marcadores de región de VSCode al código.']
 		}
 	],
 	settingsPanel: [
@@ -298,7 +382,7 @@ const config = {
 					id: 'maxBitrate',
 					name: 'Maximum Bitrate',
 					note: `The maximum bitrate (in kbps). If this is set to a negative number, the default for your quality choices is used. 
-                    The default max bitrate for free quality options is 3500kbps, and for Nitro quality options (higher than 720p or higher than 30fps) it is 9000kbps as of April 2025. 
+                    The default max bitrate for free quality options is 3500kbps, and for Nitro quality options (higher than 720p or higher than 30fps) it is 9000kbps as of April 2026. 
                     There is also a strange bug(?) where setting your max bitrate will cause issues with your stream's preview. 
                     If you want to avoid these issues, please disable this option.`,
 					value: () => settings.maxBitrate
@@ -312,6 +396,13 @@ const config = {
                     Does not allow you to go over the voice channel's set bitrate but it does allow you to go much lower. 
                     Bitrate in kbps. Disabled if this is set to -1.`,
 					value: () => settings.voiceBitrate
+				},
+				{
+					type: 'switch',
+					id: 'sharpenStreams',
+					name: 'Stream Sharpness',
+					note: "Adds a slider to the right-click / context menu of streams that allows you to adjust the sharpness of screen shares. Saves and applies your sharpness amount per user, similar to stream volume. MAKE SURE HARDWARE ACCELERATION IS ENABLED UNDER DISCORD'S ADVANCED SETTINGS OR PERFORMANCE WILL SUFFER!!",
+					value: () => settings.sharpenStreams
 				},
 				{
 					type: 'dropdown',
@@ -370,11 +461,11 @@ const config = {
 					value: () => settings.emojiBypassType,
 					options: [
 						{ label: 'Upload Emojis', value: 0 },
-						{ label: 'Ghost Link Mode', value: 1 },
-						{ label: 'Classic Mode', value: 2 },
-						{ label: 'Hyperlink/Vencord-Like Mode', value: 3 }
+						{ label: 'Hyperlink/Vencord-Like Mode', value: 3 },
+						{ label: 'Classic Mode', value: 2 }
 					]
 				},
+				{ type: 'switch', id: 'editMessageWithEmoji', name: 'Replace Fakemoji When Editing Message', note: 'Replaces text-based fakemoji with their emoji when editing a message.', value: () => settings.editMessageWithEmoji },
 				{ type: 'switch', id: 'emojiBypassForValidEmoji', name: "Don't Use Emote Bypass if Emote is Unlocked", note: 'Disable to use emoji bypass even if bypass is not required for that emoji.', value: () => settings.emojiBypassForValidEmoji },
 				{ type: 'switch', id: 'PNGemote', name: 'Use PNG instead of WEBP', note: 'Use the PNG version of static emoji for higher quality!', value: () => settings.PNGemote },
 				{ type: 'switch', id: 'stickerBypass', name: 'Sticker Bypass', note: "Enable or disable using the sticker bypass. I recommend using An00nymushun's DiscordFreeStickers over this. Animated APNG/WEBP/Lottie Stickers WILL NOT animate.", value: () => settings.stickerBypass },
@@ -401,7 +492,8 @@ const config = {
 				{ type: 'switch', id: 'customPFPs', name: 'Fake Profile Pictures', note: 'Uses invisible 3y3 encoding to allow setting custom profile pictures by hiding an image URL IN YOUR CUSTOM STATUS. Only supports Imgur URLs for security reasons.', value: () => settings.customPFPs },
 				{ type: 'switch', id: 'userPfpIntegration', name: 'UserPFP Integration', note: "Imports the UserPFP database so that people who have profile pictures in the UserPFP database will appear with their UserPFP profile picture. There's little reason to disable this.", value: () => settings.userPfpIntegration },
 				{ type: 'switch', id: 'disableUserBadge', name: 'Disable User Badge', note: 'Disables the BDNitro User Badge which appears on any user that uses Profile Customization. (client side)', value: () => settings.disableUserBadge },
-				{ type: 'switch', id: 'nameplatesEnabled', name: 'Fake Nameplates', note: 'Uses invisible 3y3 encoding to allow setting fake nameplates by hiding the information in your custom status and/or bio. Please paste the 3y3 in one or both of those areas.', value: () => settings.nameplatesEnabled }
+				{ type: 'switch', id: 'nameplatesEnabled', name: 'Fake Nameplates', note: 'Uses invisible 3y3 encoding to allow setting fake nameplates by hiding the information in your custom status and/or bio. Please paste the 3y3 in one or both of those areas.', value: () => settings.nameplatesEnabled },
+				{ type: 'switch', id: 'displayNameStyles', name: 'Fake Display Name Styles', note: 'Uses invisible 3y3 encoding to allow setting fake display name styles by hiding the information in your bio. Please paste the 3y3 information in your bio.', value: () => settings.displayNameStyles }
 			]
 		},
 		{
@@ -411,8 +503,19 @@ const config = {
 			collapsible: true,
 			shown: false,
 			settings: [
-				{ type: 'switch', id: 'useClipBypass', name: 'Use Clips Bypass', note: 'Enabling this will effectively set your file upload limit for video files to 100MB. Disable this if you have a file upload limit larger than 100MB. Enabling this option will also enable Experiments.', value: () => settings.useClipBypass },
-				{ type: 'switch', id: 'alwaysTransmuxClips', name: 'Force Transmuxing', note: 'Always transmux the video, even if transmuxing would normally be skipped. Transmuxing is only ever skipped if the codec does not include AVC1 or includes MP42.', value: () => settings.alwaysTransmuxClips },
+				{ type: 'switch', id: 'useClipBypass', name: 'Use Clips Bypass', note: 'Enabling this will effectively set your file upload limit for video files to 100MB. Disable this if you have a file upload limit larger than 100MB.', value: () => settings.useClipBypass },
+				{
+					type: 'dropdown',
+					id: 'clipTimestamp',
+					name: 'Timestamp',
+					note: 'This option lets you choose how the plugin determines the timestamp to put on the generated clip.',
+					value: () => settings.clipTimestamp,
+					options: [
+						{ label: 'Zero (January 1st, 2015)', value: 0 },
+						{ label: 'Current Date/Time', value: 1 },
+						{ label: 'Last Modified Date/Time of File', value: 2 }
+					]
+				},
 				{ type: 'switch', id: 'forceClip', name: 'Force Clip', note: 'Always send video files as a clip, even if the size is below 10MB. I recommend that you leave this option disabled.', value: () => settings.forceClip },
 				{ type: 'switch', id: 'useAudioClipBypass', name: 'Audio Clips Bypass', note: 'Identical to the Clips Bypass for videos, except it works with audio files.', value: () => settings.useAudioClipBypass },
 				{ type: 'switch', id: 'forceAudioClip', name: 'Force Audio Clip', note: 'Always send audio files as a clip, even if the size is below 10MB. I recommend that you leave this option disabled.', value: () => settings.forceAudioClip },
@@ -433,12 +536,27 @@ const config = {
 			collapsible: true,
 			shown: false,
 			settings: [
-				{ type: 'switch', id: 'changePremiumType', name: 'Change PremiumType', note: "This is now optional. Enabling this may help compatibility for certain things or harm it. SimpleDiscordCrypt requires this to be enabled to have the emoji bypass work. Only enable this if you don't have Nitro.", value: () => settings.changePremiumType },
+				{
+					type: 'dropdown',
+					id: 'changePremiumType2',
+					name: 'Change Premium Type',
+					note: "This option will set your user to different Premium Types on the client-side, unlocking (or locking) certain things. Options unlocked by this may or may not work. If you don't know what you're doing, IT'S BEST TO LEAVE THIS OPTION DISABLED.",
+					value: () => settings.changePremiumType2,
+					options: [
+						{ label: 'Disabled (Actual Nitro Status)', value: -1 },
+						{ label: 'Free User', value: null },
+						{ label: 'Nitro Basic', value: 3 },
+						{ label: 'Nitro Classic', value: 1 },
+						{ label: 'Nitro', value: 2 }
+					]
+				},
 				{ type: 'switch', id: 'clientThemes', name: 'Gradient Client Themes', note: 'Allows you to use Nitro-exclusive Client Themes.', value: () => settings.clientThemes },
 				{ type: 'switch', id: 'removeProfileUpsell', name: 'Remove Profile Customization Upsell', note: 'Removes the "Try It Out" upsell in the profile customization screen and replaces it with the Nitro variant. Note: does not allow you to use Nitro customization on Server Profiles as the API disallows this.', value: () => settings.removeProfileUpsell },
 				{ type: 'switch', id: 'removeScreenshareUpsell', name: 'Remove Screen Share Nitro Upsell', note: 'Removes the Nitro upsell in the Screen Share quality option menu.', value: () => settings.removeScreenshareUpsell },
 				{ type: 'switch', id: 'unlockAppIcons', name: 'App Icons', note: 'Unlocks app icons.', value: () => settings.unlockAppIcons },
-				{ type: 'switch', id: 'experiments', name: 'Experiments', note: 'Unlocks experiments. Use at your own risk.', value: () => settings.experiments },
+				{ type: 'switch', id: 'removeNotStaffWarning', name: 'Remove Not Staff Warning', note: 'Removes the "NOT STAFF" warning on DMs when Experiments are enabled.', value: () => settings.removeNotStaffWarning },
+				{ type: 'switch', id: 'extraContextMenus', name: 'Extra Context Menus and Options', note: 'Adds a Copy URL and Open URL buttons to the context menu that appears when you right-click an Emoji or Sticker in the Expression Picker and adds a context menu that will appear with Copy Link and Open Link options when you right-click a GIF in the GIF picker.', value: () => settings.extraContextMenus },
+				{ type: 'switch', id: 'experiments', name: 'Experiments', note: 'Unlocks experiments. Soundmoji and Enable Clips Experiments have to be disabled to turn this off. Use at your own risk.', value: () => settings.experiments || settings.soundmojiEnabled || (settings.useClipBypass && settings.enableClipsExperiment) },
 				{ type: 'switch', id: 'checkForUpdates', name: 'Check for Updates', note: 'Should the plugin check for updates on startup?', value: () => settings.checkForUpdates }
 			]
 		}
@@ -446,6 +564,48 @@ const config = {
 	main: 'BDNitro.plugin.js'
 };
 // #endregion
+
+//#region Plugin-wide Function(s)
+
+function copyToClipboard(string, successMessage, errorMessage = 'Failed to copy to clipboard!') {
+	try {
+		DiscordCopyToClipboardFn(string);
+		if (successMessage) UI.showToast(successMessage, { type: 'info' });
+	} catch (err) {
+		UI.showToast(errorMessage, { type: 'error', forceShow: true });
+		Logger.error(err);
+	}
+}
+
+function ResizeFindingElement({ id, onResize }) {
+	const ref = React.useRef(null);
+
+	React.useEffect(() => {
+		if (ref.current) {
+			const observer = new ResizeObserver((ResizeObserverEntry) => {
+				if (ResizeObserverEntry?.[0]) {
+					onResize(ResizeObserverEntry[0].contentRect.width, ResizeObserverEntry[0].contentRect.height);
+				}
+			});
+			observer.observe(ref.current);
+
+			return () => {
+				observer.disconnect();
+			};
+		}
+	}, []);
+
+	return React.createElement('div', {
+		id,
+		ref,
+		style: {
+			width: '100%',
+			height: '100%'
+		}
+	});
+}
+
+//#endregion
 
 // #region Exports
 module.exports = class BDNitro {
@@ -467,7 +627,8 @@ module.exports = class BDNitro {
 					case 'targetBitrate':
 					case 'maxBitrate':
 					case 'voiceBitrate':
-						settings[id] = parseFloat(value);
+						//protect people from their own stupidity
+						settings[id] = parseFloat(value) > 50000 ? 50000 : parseFloat(value);
 						this.saveAndUpdate();
 						break;
 					default:
@@ -483,40 +644,37 @@ module.exports = class BDNitro {
 	saveAndUpdate() {
 		//Saves and updates settings and runs functions
 
-		//migrate settings.avatarDecorations to data.avatarDecorations
-		if (settings.avatarDecorations) {
-			try {
-				data.avatarDecorations = settings.avatarDecorations;
-				this.saveDataFile();
-				delete settings.avatarDecorations;
-			} catch (err) {
-				Logger.error(this.meta.name, 'Data migration failed.');
-			}
-		}
+		ContextMenu.unpatch('expression-picker', this.expressionPickerFunction);
+		ContextMenu.unpatch('stream-context', this.streamContextPatch);
+
+		controller.abort();
+		controller = new AbortController();
 
 		//delete old nameplate data
 		if (data.nameplates) delete data.nameplates;
 
-		Data.save(this.meta.name, 'settings', settings);
+		Data.save('settings', settings);
 		this.saveDataFile();
 
-		Patcher.unpatchAll(this.meta.name);
+		Patcher.unpatchAll();
 
 		Dispatcher.unsubscribe('COLLECTIBLES_CATEGORIES_FETCH_SUCCESS', this.storeProductsFromCategories);
+		Dispatcher.unsubscribe('APP_ICON_UPDATED', this.saveAppIcon);
+		Dispatcher.unsubscribe('CURRENT_USER_UPDATE', this.experiments);
+		Dispatcher.unsubscribe('CURRENT_USER_UPDATE', this.applyPremiumType);
+		Dispatcher.unsubscribe('CURRENT_USER_UPDATE', this.updateCurrentUser);
 
-		if (settings.changePremiumType) {
-			try {
-				if (!(ORIGINAL_NITRO_STATUS > 1)) {
-					CurrentUser.premiumType = 1;
-					setTimeout(() => {
-						if (settings.changePremiumType) {
-							CurrentUser.premiumType = 1;
-						}
-					}, 10000);
-				}
-			} catch (err) {
-				Logger.error(this.meta.name, 'An error occurred changing premium type.' + err);
+		Dispatcher.subscribe('CURRENT_USER_UPDATE', this.updateCurrentUser);
+
+		try {
+			if (settings.changePremiumType2 > -1 && settings.changePremiumType2 <= 3) {
+				Dispatcher.subscribe('CURRENT_USER_UPDATE', this.applyPremiumType);
+				this.applyPremiumType();
+			} else {
+				if (CurrentUser.premiumType != ORIGINAL_NITRO_STATUS) CurrentUser.premiumType = ORIGINAL_NITRO_STATUS;
 			}
+		} catch (err) {
+			Logger.error(err);
 		}
 
 		if (isNaN(settings.CustomFPS)) settings.CustomFPS = 60;
@@ -524,10 +682,9 @@ module.exports = class BDNitro {
 
 		if (settings.ResolutionSwapper) {
 			try {
-				this.resolutionSwapper();
 				this.resolutionSwapperV2();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -535,7 +692,7 @@ module.exports = class BDNitro {
 			try {
 				this.stickerSending();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -543,26 +700,26 @@ module.exports = class BDNitro {
 			try {
 				this.unlockStickers();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
-		if (settings.emojiBypass) {
+		if (settings.emojiBypass && settings.emojiBypassType !== 0) {
 			try {
 				this.emojiBypass();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
 		if (settings.profileV2) {
 			try {
-				Patcher.after(this.meta.name, UserProfileStore, 'getUserProfile', (_, args, ret) => {
+				Patcher.after(UserProfileStore, 'getUserProfile', (_, args, ret) => {
 					if (ret == undefined) return;
 					ret.premiumType = 2;
 				});
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -570,17 +727,22 @@ module.exports = class BDNitro {
 			try {
 				this.customizeStreamButtons(); //Apply custom resolution and fps options for Go Live Modal V1
 			} catch (err) {
-				Logger.error(this.meta.name, 'Error occurred during customizeStreamButtons() ' + err);
+				Logger.error('Error occurred during customizeStreamButtons() ' + err);
 			}
 			try {
 				this.videoQualityModule(); //Custom Bitrates, FPS, Resolution
 
-				//disable resolution / fps check
-				Patcher.instead(this.meta.name, InvalidStreamSettingsModal, 'areStreamSettingsAllowed', (_, args, originalFunction) => {
-					return true;
-				});
+				if (InvalidStreamSettingsModal) {
+					let areStreamSettingsAllowed = this.findMangledName(InvalidStreamSettingsModal, (x) => x, 'areStreamSettingsAllowed');
+					if (areStreamSettingsAllowed) {
+						//disable resolution / fps check
+						Patcher.instead(InvalidStreamSettingsModal, areStreamSettingsAllowed, () => {
+							return true;
+						});
+					}
+				}
 			} catch (err) {
-				Logger.error(this.meta.name, 'Error occurred during videoQualityModule() ' + err);
+				Logger.error('Error occurred during videoQualityModule() ' + err);
 			}
 		}
 
@@ -588,58 +750,31 @@ module.exports = class BDNitro {
 			try {
 				this.clientThemes();
 			} catch (err) {
-				Logger.warn(this.meta.name, err);
+				Logger.warn(err);
 			}
 		}
 
 		if (settings.fakeProfileThemes) {
 			try {
 				this.decodeAndApplyProfileColors();
-				this.encodeProfileColors();
 			} catch (err) {
-				Logger.error(this.meta.name, 'Error occurred running fakeProfileThemes bypass. ' + err);
-			}
-		}
-
-		DOM.removeStyle(this.meta.name);
-
-		if (settings.removeScreenshareUpsell) {
-			try {
-				DOM.addStyle(
-					this.meta.name,
-					`
-                    [class*="upsellBanner"], [class*="reverseTrialEducationBannerContainer"] {
-                        display: none;
-                        visibility: hidden;
-                    }
-                `
-				);
-
-				//Disable GoLiveModalV2 upsell
-				Patcher.instead(this.meta.name, GoLiveModalV2UpsellMod, 'GoLiveModalV2Upsell', () => {
-					return;
-				});
-			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error('Error occurred running fakeProfileThemes bypass. ' + err);
 			}
 		}
 
 		if (settings.fakeProfileBanners) {
 			try {
 				this.bannerUrlDecoding();
-				this.bannerUrlEncoding(this.secondsightifyEncodeOnly);
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
-
-		Dispatcher.unsubscribe('COLLECTIBLES_CATEGORIES_FETCH_SUCCESS', this.storeProductsFromCategories);
 
 		if (settings.fakeAvatarDecorations) {
 			try {
 				this.fakeAvatarDecorations();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -647,7 +782,7 @@ module.exports = class BDNitro {
 			try {
 				this.appIcons();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -655,7 +790,7 @@ module.exports = class BDNitro {
 			try {
 				this.profileFX(this.secondsightifyEncodeOnly);
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -663,7 +798,7 @@ module.exports = class BDNitro {
 			try {
 				this.killProfileFX();
 			} catch (err) {
-				Logger.error(this.meta.name, 'Error occured during killProfileFX() ' + err);
+				Logger.error('Error occured during killProfileFX() ' + err);
 			}
 		}
 
@@ -677,40 +812,47 @@ module.exports = class BDNitro {
 		if (settings.customPFPs) {
 			try {
 				this.customProfilePictureDecoding();
-				this.customProfilePictureEncoding(this.secondsightifyEncodeOnly);
 			} catch (err) {
-				Logger.error(this.meta.name, 'An error occurred during customProfilePicture decoding/encoding. ' + err);
+				Logger.error('An error occurred during customProfilePicture decoding/encoding. ' + err);
 			}
 		}
 
-		if (settings.experiments) {
+		if (settings.experiments || settings.soundmojiEnabled || settings.enableClipsExperiment) {
 			try {
 				this.experiments();
+				Dispatcher.subscribe('CURRENT_USER_UPDATE', this.experiments);
 			} catch (err) {
-				Logger.error(this.meta.name, 'Error occurred in experiments() ' + err);
+				Logger.error('Error occurred in experiments() ' + err);
 			}
 		}
 
-		Patcher.instead(this.meta.name, canUserUseMod, 'canUserUse', (_, [feature, user], originalFunction) => {
-			if (settings.emojiBypass && (feature.name == 'emojisEverywhere' || feature.name == 'animatedEmojis')) return true;
+		try {
+			let canUserUse = this.findMangledName(CanUserUseMod, (x) => typeof x === 'function' && x.toString?.().includes?.('getFeatureValue'), 'canUserUse');
+			if (canUserUse) {
+				Patcher.instead(CanUserUseMod, canUserUse, (_, [feature, user], originalFunction) => {
+					if (settings.emojiBypass && (feature.name == 'emojisEverywhere' || feature.name == 'animatedEmojis')) return true;
 
-			if (settings.unlockAppIcons && feature.name == 'appIcons') return true;
+					if (settings.unlockAppIcons && feature.name == 'appIcons') return true;
 
-			if (settings.removeProfileUpsell && feature.name == 'profilePremiumFeatures') return true;
+					if (settings.removeProfileUpsell && feature.name == 'profilePremiumFeatures') return true;
 
-			if (settings.clientThemes && feature.name == 'clientThemes') return true;
+					if (settings.clientThemes && feature.name == 'clientThemes') return true;
 
-			if (settings.soundmojiEnabled && feature.name == 'soundboardEverywhere') return true;
+					if (settings.soundmojiEnabled && feature.name == 'soundboardEverywhere') return true;
 
-			return originalFunction(feature, user);
-		});
+					return originalFunction(feature, user);
+				});
+			}
+		} catch (err) {
+			Logger.error(err);
+		}
 
 		//Clips Bypass
-		if (settings.useClipBypass || settings.useAudioClipBypass) {
+		if (settings.useClipBypass || settings.useAudioClipBypass || settings.zipClip) {
 			try {
 				this.clipsBypass();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -718,7 +860,7 @@ module.exports = class BDNitro {
 			try {
 				this.inlineFakemojiPatch();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -726,7 +868,7 @@ module.exports = class BDNitro {
 			try {
 				this._sendMessageInsteadPatch();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
@@ -734,28 +876,1447 @@ module.exports = class BDNitro {
 			try {
 				this.videoCodecs();
 			} catch (err) {
-				Logger.error(this.meta.name, err);
+				Logger.error(err);
 			}
 		}
 
-		if (settings.fakeAvatarDecorations || settings.nameplatesEnabled) {
-			//subscribe to successful collectible category fetch event
-			Dispatcher.subscribe('COLLECTIBLES_CATEGORIES_FETCH_SUCCESS', this.storeProductsFromCategories);
+		try {
+			if (settings.fakeAvatarDecorations || settings.nameplatesEnabled) {
+				//subscribe to successful collectible category fetch event
+				Dispatcher.subscribe('COLLECTIBLES_CATEGORIES_FETCH_SUCCESS', this.storeProductsFromCategories);
 
-			//trigger collectibles fetch
-			FetchCollectibleCategories({
-				includeBundles: true,
-				includeUnpublished: false,
-				noCache: false,
-				paymentGateway: undefined
+				//trigger collectibles fetch
+				FetchCollectibleCategories({
+					includeBundles: true,
+					includeUnpublished: false,
+					noCache: false,
+					paymentGateway: undefined
+				});
+			}
+		} catch (err) {
+			Logger.error(err);
+		}
+
+		try {
+			if (settings.nameplatesEnabled) {
+				this.nameplates();
+			}
+		} catch (err) {
+			Logger.error(err);
+		}
+
+		try {
+			if (settings.removeNotStaffWarning && DMTag) {
+				Patcher.after(
+					DMTag,
+					this.findMangledName(DMTag, (x) => x.toString().includes('GROUP_DM') && !x.toString().includes('GUILD_DIRECTORY')),
+					(_, [args], ret) => {
+						if (ret?.props?.children) {
+							ret.props.children = ret.props.children.filter((o) => !o.type?.toString?.().includes?.('NOT_STAFF_WARNING'));
+						}
+					}
+				);
+			}
+		} catch (err) {
+			Logger.error(err);
+		}
+
+		if (settings.extraContextMenus) {
+			this.extraContextMenus();
+		}
+
+		if (settings.sharpenStreams) {
+			try {
+				this.sharpenStreams();
+				this.sharpenPipPlayer();
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+
+		if (settings.displayNameStyles) {
+			try {
+				this.displayNameStyles();
+				if (ORIGINAL_NITRO_STATUS != 2) {
+					this.displayNameStylesSection();
+				}
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+
+		if (UserAvatar?.render) {
+			Patcher.after(UserAvatar, 'render', (_, [args], ret) => {
+				if (ret?.props && args?.src) {
+					ret.props.onContextMenu = (e) => {
+						let userId = args.src.replace('https://cdn.discordapp.com/avatars/', '').split('/')[0];
+						let user = UserStore.getUser(userId);
+
+						//get channel id of first selectable channel in first guild
+						let channel = Object.values(GuildChannelStore.getAllGuilds()).filter((o) => o?.SELECTABLE?.[0]?.channel)?.[0]?.SELECTABLE?.[0]?.channel;
+
+						//if we cant find one, look for last selected channel
+						// unless there is no last selected channel id, in which case get the first available DM channel
+						if (!channel) channel = SelectedChannelStore.getLastSelectedChannelId() ? ChannelStore.getChannel(SelectedChannelStore.getLastSelectedChannelId()) : ChannelStore.getSortedPrivateChannels()?.[0];
+
+						if (channel) UserContextMenuFunctions.openUserContextMenu(e, user, channel);
+					};
+				}
 			});
 		}
 
-		if (settings.nameplatesEnabled) {
-			this.nameplates();
+		try {
+			this.settingsUI();
+		} catch (err) {
+			Logger.error(err);
 		}
+
+		/* try{
+            this.bookmarks();
+        }catch(err){
+            Logger.error(err);
+        } */
 	} //End of saveAndUpdate()
 	// #endregion
+
+	async settingsUI() {
+		if (!this.settingsUIMod) this.settingsUIMod = await Webpack.waitForModule(Webpack.Filters.bySource('userNameplate', 'guildNameplate', 'pendingNameplate', 'titleIcon'), { raw: true, signal: controller.signal });
+		if (!this.settingsUIMod) {
+			Logger.warn('Settings UI module was undefined.');
+			return;
+		}
+		if (!this.settingsUIMod.declarations) {
+			UI.showToast('[BDNitro] Update your BetterDiscord!', { type: 'error', forceShow: true });
+			return;
+		}
+
+		if (settings.fakeProfileBanners || settings.fakeProfileThemes || settings.customPFPs) {
+			this.perServerSection();
+		}
+
+		if (settings.nameplatesEnabled) {
+			try {
+				this.nameplatesUI();
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+		if (settings.fakeAvatarDecorations) {
+			try {
+				this.avatarDecorationsUI();
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+		if (settings.customPFPs) {
+			try {
+				this.customPfpUI();
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+		if (settings.profileEffects) {
+			try {
+				this.profileFxUI();
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+		if (settings.fakeProfileBanners) {
+			try {
+				this.bannerUrlUI();
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+		if (settings.fakeProfileThemes) {
+			try {
+				this.profileThemesUI();
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+	}
+
+	// #region Custom PFP UI
+	//Custom PFP profile customization buttons and encoding code.
+	customPfpUI() {
+		function emptyWarn() {
+			UI.showToast('No URL was provided. Please enter an Imgur URL.', { type: 'warning' });
+		}
+
+		let secondsightifyEncodeOnly = this.secondsightifyEncodeOnly;
+
+		let AvatarSectionFnName = this.findMangledName(this.settingsUIMod.declarations, Webpack.Filters.byStrings('showRemoveAvatarButton', 'onAvatarChange', 'isTryItOut', 'forcedDivider'), 'AvatarSection');
+		if (!AvatarSectionFnName) return;
+
+		Patcher.before(this.settingsUIMod.declarations, AvatarSectionFnName, (_, [args]) => {
+			args.disabled = false;
+		});
+
+		Patcher.after(this.settingsUIMod.declarations, AvatarSectionFnName, (_, [args], ret) => {
+			if (!args) return;
+			if (!ret) return;
+
+			//don't need to do anything if this is the "Try out Nitro" flow.
+			if (args.isTryItOut) return;
+
+			if (ret?.props?.children) {
+				ret.props.children = [ret.props.children];
+				ret.props.children.push(
+					React.createElement('div', {
+						style: {
+							display: 'flex',
+							marginTop: '4px'
+						},
+						children: [
+							React.createElement('input', {
+								id: 'profilePictureUrlInput',
+								style: {
+									maxWidth: '112px',
+									marginTop: '4px'
+								},
+								placeholder: 'PFP Imgur URL'
+							}),
+							//Create and append Copy PFP 3y3 button.
+							React.createElement('button', {
+								children: 'Copy PFP 3y3',
+								className: `bd-generic-button`,
+								id: 'profilePictureButton',
+								style: {
+									marginLeft: '5px',
+									whiteSpace: 'nowrap'
+								},
+								onClick: async function () {
+									//on copy pfp 3y3 button click
+
+									//grab text from pfp url input textarea.
+									let profilePictureUrlInputValue = String(document.getElementById('profilePictureUrlInput').value);
+
+									//empty, skip.
+									if (profilePictureUrlInputValue == undefined || profilePictureUrlInputValue == '') {
+										emptyWarn();
+										return;
+									}
+
+									//clean up string to encode
+									let stringToEncode =
+										'' +
+										profilePictureUrlInputValue
+											//clean up URL
+											.replace('http://', '') //remove protocol
+											.replace('https://', '')
+											.replace('i.imgur.com', 'imgur.com');
+
+									let encodedStr = ''; //initialize encoded string as empty string
+									stringToEncode = String(stringToEncode); //make doubly sure stringToEncode is a string
+
+									//if url seems correct
+									if (stringToEncode.toLowerCase().startsWith('imgur.com')) {
+										//Check for album or gallery URL
+										if (stringToEncode.replace('imgur.com/', '').startsWith('a/') || stringToEncode.replace('imgur.com/', '').startsWith('gallery/')) {
+											//Album URL, what follows is all to get the direct image link, since the album URL is not a direct link to the file.
+
+											//Fetch imgur album page
+											try {
+												const parser = new DOMParser();
+												stringToEncode = await Net.fetch('https://' + stringToEncode, {
+													method: 'GET',
+													mode: 'cors'
+												}).then((res) =>
+													res
+														.text()
+														//parse html, queryselect meta tag with certain name
+														.then((res) => parser.parseFromString(res, 'text/html').querySelector('[name="twitter:player"]').content)
+												);
+												stringToEncode = stringToEncode
+													.replace('http://', '') //get rid of protocol
+													.replace('https://', '') //get rid of protocol
+													.replace('i.imgur.com', 'imgur.com')
+													.replace('.jpg', '')
+													.replace('.jpeg', '')
+													.replace('.webp', '')
+													.replace('.png', '')
+													.replace('.mp4', '')
+													.replace('.webm', '')
+													.replace('.gifv', '')
+													.replace('.gif', '') //get rid of any file extension
+													.split('?')[0]; //remove any URL parameters since we don't want or need them
+											} catch (err) {
+												Logger.error(err);
+												UI.showToast('An error occurred. Are there multiple images in this album/gallery?', { type: 'error', forceShow: true });
+												return;
+											}
+										}
+										if (stringToEncode == '') {
+											UI.showToast("An error occurred: couldn't find file name.", { type: 'error', forceShow: true });
+											Logger.error("Couldn't find file name for some reason when grabbing Imgur URL for Custom PFP. Contact SrGobi!");
+										}
+
+										//add starting "P{" , remove "imgur.com/" , and add ending "}"
+										stringToEncode = 'P{' + stringToEncode.replace('imgur.com/', '') + '}';
+										//finally encode the string, adding a space before it so nothing fucks up
+										encodedStr = ' ' + secondsightifyEncodeOnly(stringToEncode);
+
+										//If this is not an Imgur URL, yell at the user.
+									} else if (stringToEncode.toLowerCase().startsWith('imgur.com') == false) {
+										UI.showToast('Please use Imgur!', { type: 'warning' });
+										return;
+									}
+
+									//if somehow none of the previous code ran, this is the last protection against an error. If this runs, something has probably gone horribly wrong.
+									if (encodedStr == '') return;
+
+									copyToClipboard(encodedStr, '3y3 copied to clipboard!');
+								} //end copy pfp 3y3 click event
+							}) //end of react createElement of button
+						]
+					}) //end of react createElement of div
+				); //end of element push
+			}
+		}); //end of patch
+	} //End of customPfpUI()
+	// #endregion
+
+	//#region Per Server
+	perServerSection() {
+		const PremiumUpsellOverlay = this.findMangledName(this.settingsUIMod.declarations, Webpack.Filters.byStrings('PREMIUM_UPSELL_OVERLAY', 'showOverlay', 'PREMIUM_UPSELL_VIEWED'));
+		if (PremiumUpsellOverlay) {
+			Patcher.before(this.settingsUIMod.declarations, PremiumUpsellOverlay, (_, [args]) => {
+				args.showOverlay = false;
+			});
+		}
+	}
+	//#endregion
+
+	//#region Nameplates UI
+	nameplatesUI() {
+		let NameplateSection = this.findMangledName(this.settingsUIMod.declarations, Webpack.Filters.byStrings('userNameplate', 'guildNameplate', 'pendingNameplate', 'titleIcon'), 'NameplateSection');
+		if (NameplateSection) {
+			const secondsightifyEncodeOnly = this.secondsightifyEncodeOnly;
+			function NameplateList({ NameplatePreviewName }) {
+				let [query, setQuery] = React.useState('');
+
+				let nameplatesList = [];
+
+				if (NameplatePreview) {
+					if (!data?.nameplatesV2 || data?.nameplatesV2?.length < 1) {
+						return React.createElement('h1', {
+							children: 'No nameplates were found!',
+							style: {
+								color: 'red',
+								fontWeight: 'bold'
+							}
+						});
+					} else {
+						const listOfNameplates = Object.values(data.nameplatesV2);
+						const listOfNameplateSkuIds = Object.keys(data.nameplatesV2);
+
+						for (let i = 0; i < listOfNameplates.length; i++) {
+							let nameplate = listOfNameplates[i];
+							let skuId = listOfNameplateSkuIds[i];
+							if (nameplate) {
+								if (query != '' && !nameplate.name.toLowerCase().includes(query.toLowerCase())) {
+									continue;
+								}
+								nameplatesList.push(
+									React.createElement('div', {
+										children: React.createElement(NameplatePreview[NameplatePreviewName].type, {
+											user: CurrentUser,
+											isHighlighted: true,
+											nameplate: {
+												asset: `nameplates/${nameplate.asset.slice(0, -1)}`,
+												palette: nameplate.palette,
+												skuId,
+												label: nameplate.label ? nameplate.label : ''
+											},
+											isPurchased: true
+										}),
+										style: {
+											borderRadius: '10px',
+											width: '95%',
+											marginLeft: 'auto',
+											marginRight: 'auto',
+											height: '42px',
+											marginTop: '10px',
+											position: 'relative',
+											top: '5px',
+											cursor: 'pointer'
+										},
+										onClick: () => {
+											//make 3y3 string
+											let strToEncode = `n{${skuId},${nameplate.palette}}`;
+											let encodedStr = secondsightifyEncodeOnly(strToEncode);
+
+											copyToClipboard(' ' + encodedStr, '3y3 copied to clipboard!');
+										},
+										title: nameplate.name
+									})
+								);
+							}
+						}
+						return React.createElement('div', {
+							children: [
+								React.createElement(Components.TextInput, {
+									value: query,
+									placeholder: 'Search...',
+									onChange: (input) => setQuery(input)
+								}),
+								React.createElement('br'),
+								React.createElement('div', {
+									children: nameplatesList
+								})
+							]
+						});
+					}
+				} else {
+					return React.createElement('h1', {
+						children: 'Error: Nameplate Preview element is undefined!',
+						style: {
+							color: 'red',
+							fontWeight: 'bold'
+						}
+					});
+				}
+			}
+
+			const NameplatePreviewName = this.findMangledName(NameplatePreview, (x) => x?.type?.toString?.().includes?.('showPlaceholderUser'));
+
+			Patcher.after(this.settingsUIMod.declarations, NameplateSection, (_, [args], ret) => {
+				//disable for per-server profiles screen
+				if (args?.guild && ORIGINAL_NITRO_STATUS != 2) return;
+
+				if (ret?.props?.children) {
+					ret.props.children = [ret.props.children];
+					ret.props.children.push(
+						React.createElement('button', {
+							className: `bd-generic-button`,
+							style: {
+								height: '30px',
+								marginTop: '8px',
+								width: 'auto',
+								height: '30px'
+							},
+							children: 'Change Nameplate [BDNitro]',
+							onClick: () => {
+								UI.showConfirmationModal('Change Nameplate', React.createElement(NameplateList, { NameplatePreviewName }), { cancelText: '' });
+							}
+						})
+					);
+				}
+			});
+		}
+	}
+	//#endregion
+
+	//#region Avatar Decorations UI
+	avatarDecorationsUI() {
+		let decorationCustomizationSectionName = this.findMangledName(this.settingsUIMod.declarations, Webpack.Filters.byStrings('pendingAvatarDecoration', 'forcedDivider'));
+
+		//Avatar decoration customization section patch
+		Patcher.after(this.settingsUIMod.declarations, decorationCustomizationSectionName, (_, [args], ret) => {
+			if (!args) return;
+
+			//don't run if this is the try out nitro flow.
+			if (args.isTryItOut) return;
+
+			//disable for the per-server profiles screen
+			if (args.guild && ORIGINAL_NITRO_STATUS != 2) return;
+
+			//push change decoration button
+			if (ret?.props?.children?.props?.children) {
+				ret.props.children.props.children.push(
+					React.createElement('button', {
+						id: 'decorationButton',
+						children: 'Change Decoration [BDNitro]',
+						style: {
+							width: '100px',
+							height: '50px',
+							color: 'white',
+							marginLeft: '5px'
+						},
+						className: 'bd-generic-button',
+						onClick: () => {
+							UI.showConfirmationModal('Change Avatar Decoration (BDNitro)', React.createElement(DecorModal), { cancelText: '' });
+						}
+					})
+				);
+			} else {
+				Logger.error("Decoration Section ain't right chief.");
+			}
+
+			const secondsightifyEncodeOnly = this.secondsightifyEncodeOnly;
+
+			function AvatarDecorations() {
+				if (!data.avatarDecorations) throw new Error(`Cannot possibly continue! Avatar decoration data is undefined! Did the data JSON fail to load?`);
+				let listOfDecorationIds = Object.keys(data.avatarDecorations);
+				let avatarDecorationChildren = [];
+
+				//for each avatar decoration
+				for (let i = 0; i < listOfDecorationIds.length; i++) {
+					const decorationId = listOfDecorationIds[i];
+					const assetHash = data.avatarDecorations[decorationId];
+
+					if (decorationId && assetHash) {
+						//remove existing nameplates from decoration list
+						if (assetHash.includes('nameplate')) {
+							delete data.avatarDecorations[decorationId];
+							continue;
+						}
+
+						//encode to 3y3 and store clipboard copy in onclick event
+						let encodedStr = secondsightifyEncodeOnly('/a' + decorationId); // /a[id]
+						//javascript that runs onclick for each avatar decoration button
+
+						let child = React.createElement('img', {
+							style: {
+								width: '23%',
+								cursor: 'pointer',
+								marginLeft: '5px',
+								marginBottom: '10px',
+								borderRadius: '4px',
+								backgroundColor: 'var(--background-base-lower)'
+							},
+							onClick: () => {
+								copyToClipboard(' ' + encodedStr, '3y3 copied to clipboard!');
+							},
+							onMouseOver: (e) => {
+								e.target.src = e.target.src.replace('.webp', '.png');
+							},
+							onMouseLeave: (e) => {
+								e.target.src = e.target.src.replace('.png', '.webp');
+							},
+							src: 'https://cdn.discordapp.com/avatar-decoration-presets/' + assetHash + '.webp?size=128'
+						});
+						avatarDecorationChildren.push(child);
+
+						//add newline every 4th decoration
+						if ((i + 1) % 4 == 0) {
+							//avatarDecorationsHTML += "<br>"
+							avatarDecorationChildren.push(React.createElement('br'));
+						}
+					}
+				}
+				return React.createElement('div', {
+					children: avatarDecorationChildren
+				});
+			}
+
+			function DecorModal() {
+				return React.createElement('div', {
+					style: {
+						width: '100%',
+						display: 'block',
+						color: 'white',
+						whiteSpace: 'nowrap',
+						overflow: 'visible',
+						marginTop: '.5em'
+					},
+					children: React.createElement(AvatarDecorations)
+				});
+			}
+		}); //end patch of profile decoration section renderer function
+	}
+	//#endregion
+
+	//#region Effects UI
+	profileFxUI() {
+		let ProfileEffectSectionFnName = this.findMangledName(this.settingsUIMod.declarations, Webpack.Filters.byStrings('pendingProfileEffect', 'initialSelectedEffect'), 'ProfileEffectSection');
+		if (!ProfileEffectSectionFnName) return;
+
+		let secondsightifyEncodeOnly = this.secondsightifyEncodeOnly;
+
+		//patch profile effect section renderer function
+		Patcher.after(this.settingsUIMod.declarations, ProfileEffectSectionFnName, (_, [args], ret) => {
+			if (!args) return;
+			if (args.isTryItOut) return;
+			if (args.guild && ORIGINAL_NITRO_STATUS != 2) return;
+			if (!ret?.props?.children?.props?.children) return;
+
+			function ProfileEffects({ query }) {
+				let profileEffectChildren = [];
+				let actualRuns = 0;
+
+				let profileEffectsArray = Object.values(profileEffects);
+				//for each profile effect
+				for (let i = 0; i < profileEffectsArray.length; i++) {
+					//get preview image url
+					const previewURL = profileEffectsArray[i].thumbnailPreviewSrc;
+					const title = profileEffectsArray[i].title;
+
+					//search
+					if (query.trim() != '') {
+						if (title) {
+							if (!title.toLowerCase().includes(query)) continue;
+						} else continue;
+					}
+
+					//encode 3y3
+					let encodedStr = secondsightifyEncodeOnly('fx' + profileEffectsArray[i].skuId); // fx1293373563381878836
+					//javascript that runs onclick for each profile effect button
+					let copyDecoration3y3 = function () {
+						copyToClipboard(' ' + encodedStr, '3y3 copied to clipboard!');
+					};
+
+					profileEffectChildren.push(
+						React.createElement('img', {
+							className: 'riolubruhsSecretStuff',
+							onClick: copyDecoration3y3,
+							src: previewURL,
+							title,
+							style: {
+								width: '22.5%',
+								cursor: 'pointer',
+								marginBottom: '0.5em',
+								marginLeft: '0.5em',
+								backgroundColor: 'var(--background-base-lower)'
+							}
+						})
+					);
+
+					//add newline every 4th profile effect
+					if ((actualRuns + 1) % 4 == 0) {
+						profileEffectChildren.push(React.createElement('br'));
+					}
+
+					actualRuns++;
+				}
+				return React.createElement('div', {
+					children: profileEffectChildren,
+					style: {
+						paddingTop: '10px'
+					}
+				});
+			}
+
+			//Profile Effects Modal
+			function EffectsModal() {
+				const [query, setQuery] = React.useState('');
+
+				return React.createElement('div', {
+					style: {
+						width: '100%',
+						display: 'block',
+						color: 'white',
+						whiteSpace: 'nowrap',
+						overflow: 'visible',
+						marginTop: '.5em'
+					},
+					children: [
+						React.createElement(Components.TextInput, {
+							value: query,
+							placeholder: 'Search...',
+							onChange: (input) => setQuery(input),
+							style: {
+								backgroundColor: `var(--control-secondary-background-default)`
+							}
+						}),
+						React.createElement('br'),
+						React.createElement(ProfileEffects, { query })
+					]
+				});
+			}
+
+			//Append Change Effect button
+			ret.props.children.props.children.push(
+				//self explanatory create react element
+				React.createElement('button', {
+					children: 'Change Effect [BDNitro]',
+					className: `bd-generic-button`,
+					size: 'bd-button-small',
+					id: 'changeProfileEffectButton',
+					style: {
+						width: '100px',
+						height: '32px',
+						color: 'white',
+						marginLeft: '4px'
+					},
+					onClick: () => {
+						UI.showConfirmationModal('Change Profile Effect (BDNitro)', React.createElement(EffectsModal), { cancelText: '' });
+					}
+				})
+			);
+		}); //end patch of profile effect section renderer function
+	}
+	//#endregion
+
+	//#region Banner UI
+	//Make buttons in profile customization settings, encode imgur URLs and copy to clipboard
+	bannerUrlUI() {
+		let BannerSectionFnName = this.findMangledName(this.settingsUIMod.declarations, Webpack.Filters.byStrings('showRemoveBannerButton', 'isTryItOut', 'onBannerChange', 'forcedDivider'), 'BannerSection');
+		if (!BannerSectionFnName) return;
+
+		function emptyWarn() {
+			UI.showToast('No URL was provided. Please enter an Imgur URL.', { type: 'warning' });
+		}
+
+		Patcher.before(this.settingsUIMod.declarations, BannerSectionFnName, (_, [args]) => {
+			args.disabled = false;
+		});
+
+		let secondsightifyEncodeOnly = this.secondsightifyEncodeOnly;
+
+		Patcher.after(this.settingsUIMod.declarations, BannerSectionFnName, (_, [args], ret) => {
+			//create and append profileBannerUrlInput input element.
+			let profileBannerUrlInput = React.createElement('input', {
+				id: 'profileBannerUrlInput',
+				placeholder: 'Banner Imgur URL',
+				style: {
+					float: 'right',
+					width: '116px',
+					height: '20%',
+					maxHeight: '50%',
+					marginTop: '3px'
+				}
+			});
+
+			if (ret?.props?.children) {
+				ret.props.children = [ret.props.children];
+				ret.props.children.push(
+					React.createElement('div', {
+						style: {
+							marginTop: '8px',
+							display: 'flex'
+						},
+						children: [
+							profileBannerUrlInput,
+							React.createElement('button', {
+								id: 'profileBannerButton',
+								children: 'Copy Banner 3y3',
+								className: `bd-generic-button`,
+								size: 'bd-button-small',
+								style: {
+									whiteSpace: 'nowrap',
+									marginLeft: '4px',
+									width: '116px',
+									height: '30px'
+								},
+								onClick: async function () {
+									//Upon clicking Copy 3y3 button
+
+									//grab text from banner URL input textarea
+									let profileBannerUrlInputValue = String(document.getElementById('profileBannerUrlInput').value);
+
+									//if it's empty, stop processing and issue a warning.
+									if (profileBannerUrlInputValue == undefined) {
+										emptyWarn();
+										return;
+									}
+									if (profileBannerUrlInputValue == '') {
+										emptyWarn();
+										return;
+									}
+
+									//clean up string to encode
+									let stringToEncode =
+										'' +
+										profileBannerUrlInputValue
+											.replace('http://', '') //get rid of protocol
+											.replace('https://', '')
+											.replace('.jpg', '')
+											.replace('.png', '')
+											.replace('.mp4', '')
+											.replace('webm', '')
+											.replace('i.imgur.com', 'imgur.com'); //change i.imgur.com to imgur.com
+
+									let encodedStr = ''; //initialize encoded string as empty string
+
+									stringToEncode = String(stringToEncode); //make doubly sure stringToEncode is a string
+
+									//if url seems correct
+									if (stringToEncode.toLowerCase().startsWith('imgur.com')) {
+										//Check for album or gallery URL
+										if (stringToEncode.replace('imgur.com/', '').startsWith('a/') || stringToEncode.replace('imgur.com/', '').startsWith('gallery/')) {
+											//Album URL, what follows is all to get the direct image link, since the album URL is not a direct link to the file.
+
+											//Fetch imgur album page
+											try {
+												const parser = new DOMParser();
+												stringToEncode = await Net.fetch('https://' + stringToEncode, {
+													method: 'GET',
+													mode: 'cors'
+												}).then((res) =>
+													res
+														.text()
+														//parse html, queryselect meta tag with certain name
+														.then((res) => parser.parseFromString(res, 'text/html').querySelector('[name="twitter:player"]').content)
+												);
+												stringToEncode = stringToEncode
+													.replace('http://', '') //get rid of protocol
+													.replace('https://', '') //get rid of protocol
+													.replace('i.imgur.com', 'imgur.com')
+													.replace('.jpg', '')
+													.replace('.jpeg', '')
+													.replace('.webp', '')
+													.replace('.png', '')
+													.replace('.mp4', '')
+													.replace('.webm', '')
+													.replace('.gifv', '')
+													.replace('.gif', '') //get rid of any file extension
+													.split('?')[0]; //remove any URL parameters since we don't want or need them
+											} catch (err) {
+												Logger.error(err);
+												UI.showToast('An error occurred. Are there multiple images in this album/gallery?', { type: 'error', forceShow: true });
+												return;
+											}
+										}
+										if (stringToEncode == '') {
+											UI.showToast("An error occurred: couldn't find file name.", { type: 'error', forceShow: true });
+											Logger.error("Couldn't find file name when trying to grab Imgur URL for Profile Banner for some reason. Contact SrGobi.");
+											return;
+										}
+										//add starting "B{" , remove "imgur.com/" , and add ending "}"
+										stringToEncode = 'B{' + stringToEncode.replace('imgur.com/', '') + '}';
+										//finally encode the string, adding a space before it so nothing fucks up
+										encodedStr = ' ' + secondsightifyEncodeOnly(stringToEncode);
+
+										//If this is not an Imgur URL, yell at the user.
+									} else if (stringToEncode.toLowerCase().startsWith('imgur.com') == false) {
+										UI.showToast('Please use Imgur!', { type: 'warning' });
+										return;
+									}
+
+									//if somehow none of the previous code ran, this is the last protection against an error. If this runs, something has probably gone horribly wrong.
+									if (encodedStr == '') return;
+
+									//copy to clipboard
+									copyToClipboard(encodedStr, '3y3 copied to clipboard!');
+								} //end of onClick function
+							}) //end of button react createElement
+						] //end of children
+					})
+				); //end of profileBannerButton element push
+			}
+		}); //end of patched function
+	} //End of bannerUrlUI()
+	//#endregion
+
+	//#region Profile Themes UI
+	//Everything that has to do with the GUI and encoding of the fake profile colors 3y3 shit.
+	profileThemesUI() {
+		let profileThemesSectionFnName = this.findMangledName(this.settingsUIMod.declarations, Webpack.Filters.byStrings('__invalid_profileThemesSection'), 'ProfileThemesSection');
+		if (!profileThemesSectionFnName) return;
+
+		Patcher.after(this.settingsUIMod.declarations, profileThemesSectionFnName, (_, [args], ret) => {
+			//enable in per-server profile section
+			ret.props.disabled = false;
+
+			ret.props.children.props.children.push(
+				//append copy colors 3y3 button
+				React.createElement('button', {
+					id: 'copy3y3button',
+					children: 'Copy Colors 3y3',
+					className: `bd-generic-button`,
+					style: {
+						height: '32px',
+						width: 'auto',
+						marginLeft: '10px',
+						marginTop: '10px'
+					},
+					onClick: () => {
+						let primary = args?.pendingColors?.[0];
+						let accent = args?.pendingColors?.[1];
+
+						if (isNaN(primary) || isNaN(accent)) {
+							primary = ret?.props?.children?.props?.children?.[0]?.props?.children?.props?.color;
+							accent = ret?.props?.children?.props?.children?.[1]?.props?.children?.props?.color;
+						}
+
+						if (isNaN(primary) || isNaN(accent)) {
+							Logger.error('Primary:', primary, 'Accent:', accent);
+							UI.showToast('Nothing has been copied!', { type: 'error' });
+							return;
+						}
+
+						let message = `[#${primary.toString(16).padStart(6, '0')},#${accent.toString(16).padStart(6, '0')}]`;
+
+						const padding = '';
+						let encoded = Array.from(message)
+							.map((x) => x.codePointAt(0))
+							.filter((x) => x >= 0x20 && x <= 0x7f)
+							.map((x) => String.fromCodePoint(x + 0xe0000))
+							.join('');
+
+						let encodedStr = (padding || '') + ' ' + encoded;
+
+						copyToClipboard(encodedStr, '3y3 copied to clipboard!');
+					}
+				})
+			);
+		});
+	} //End of profileThemesUI()
+	//#endregion
+
+	/* bookmarks(){
+        const temp = Webpack.getById("216623");
+
+        Patcher.instead(temp, "oN", (_,[message],og) => {
+            console.log("put message", message);
+
+            //push message
+            data.savedMessages.push({
+                saveData: message,
+                message: MessageStore.getMessage(message.channelId, message.messageId)
+            });
+
+            console.log(data.savedMessages);
+            
+            Dispatcher.dispatch({
+                type: "SAVED_MESSAGE_CREATE",
+                savedMessage: {
+                    saveData: message,
+                    message: MessageStore.getMessage(message.channelId, message.messageId)
+                }
+            });
+
+            this.saveDataFile();
+
+            return Promise.resolve();
+        })
+
+        //get saved messages
+        Patcher.instead(temp, "AX", () => {
+            console.log("get saved messages", data.savedMessages);
+            Dispatcher.dispatch({
+                type: "SAVED_MESSAGES_UPDATE",
+                savedMessages: data.savedMessages
+            });
+            return Promise.resolve();
+        });
+
+        Patcher.instead(temp, "cf", (_,[message],og) => {
+            //remove bookmark
+            console.log("remove bookmark", message);
+            data.savedMessages = data.savedMessages.filter(x=>x.saveData.messageId != message.messageId);
+            Dispatcher.dispatch({
+                type: "SAVED_MESSAGES_UPDATE",
+                savedMessages: data.savedMessages
+            });
+
+            this.saveDataFile();
+            
+            return Promise.resolve();
+        });
+    } */
+
+	applyPremiumType() {
+		const currentUser = UserStore.getCurrentUser();
+		currentUser.premiumType = settings.changePremiumType2;
+	}
+
+	updateCurrentUser() {
+		CurrentUser = UserStore.getCurrentUser();
+	}
+
+	//#region Display Name Styles
+	async displayNameStyles() {
+		Patcher.after(UserStore, 'getUser', (_, [userId], ret) => {
+			let revealedText = this.getRevealedText(userId, `\uDB40\uDC53\uDB40\uDC7B`);
+			if (revealedText) {
+				let regex = /S\{[^}]*?\}/;
+				//Check if there are any matches in the revealed text.
+				let matches = revealedText.match(regex);
+				if (matches == undefined) return;
+
+				let firstMatch = matches[0];
+				if (firstMatch == undefined) return;
+
+				//slice off the S{ and the ending }
+				let styleDataStr = firstMatch.slice(2, -1);
+
+				let styleDataArr = styleDataStr.split(',');
+				if (styleDataArr) {
+					let fontId = Number(styleDataArr?.[0]);
+					let effectId = Number(styleDataArr?.[1]);
+					let color1 = Number(styleDataArr?.[2]);
+					let color2;
+					if (styleDataArr.length >= 4) {
+						color2 = Number(styleDataArr?.[3]);
+					}
+
+					if (Number.isNaN(color1) || Number.isNaN(color2) || Number.isNaN(fontId) || Number.isNaN(effectId)) return;
+
+					if ((fontId, effectId, color1)) {
+						let styleData = {
+							fontId,
+							effectId,
+							colors: [Number(color1)]
+						};
+
+						if (color2) styleData.colors.push(color2);
+
+						if (!Object.prototype.hasOwnProperty.call(ret, 'displayNameStyles')) {
+							Object.defineProperty(ret, 'displayNameStyles', {
+								value: cache,
+								enumerable: true,
+								configurable: true,
+								writable: true
+							});
+						} else {
+							ret.displayNameStyles = styleData;
+						}
+					}
+				}
+			}
+		});
+
+		if (!this.DisplayNameStylesModal) this.DisplayNameStylesModal = await Webpack.waitForModule(Webpack.Filters.bySource('DisplayNameStylesModal'), { signal: controller.signal });
+
+		let renderFn = this.findMangledName(this.DisplayNameStylesModal, (x) => x, 'DisplayNameStylesModal');
+		if (renderFn) {
+			Patcher.after(this.DisplayNameStylesModal, renderFn, (_, args, ret) => {
+				const selectionArea = ret?.props?.children?.props?.children?.props?.children?.[0]?.props?.children?.[0]?.props?.children;
+				const font = selectionArea?.[1]?.props?.selectedFontId;
+				const effect = selectionArea?.[2]?.props?.selectedEffectId;
+				const colors = selectionArea?.[3]?.props?.selectedColors;
+
+				if (ret && font && effect && colors) {
+					if (ret?.props?.children?.props?.children?.props?.children) {
+						ret.props.children.props.children.props.children.splice(
+							1,
+							0,
+							React.createElement(Components.Button, {
+								children: 'Copy 3y3',
+								color: Components.Button.Colors.PRIMARY,
+								look: Components.Button.Looks.OUTLINED,
+								style: {
+									top: '64px',
+									width: '90px',
+									left: '50%',
+									zIndex: '2',
+									background: 'var(--control-secondary-background-default)',
+									borderRadius: '8px'
+								},
+								onClick: () => {
+									//encoding part                          ex: S{11,1,15724528,15724528}
+									let encoded = this.secondsightifyEncodeOnly(`S\{${font},${effect},${colors.toString()}\}`);
+									copyToClipboard(' ' + encoded, '3y3 copied to clipboard!');
+								}
+							})
+						);
+					}
+				}
+			});
+		}
+	}
+	//#endregion
+
+	//#region Display Name Styles UI
+	async displayNameStylesSection() {
+		if (!this.DisplayNameSection) this.DisplayNameSection = await Webpack.waitForModule(Webpack.Filters.bySource('pendingGlobalName', 'onGlobalNameChange', 'currentGlobalName'), { signal: controller.signal });
+		let renderFn2 = this.findMangledName(this.DisplayNameSection, (x) => x, 'DisplayNameSection');
+
+		if (!this.DisplayNameStylesSection) this.DisplayNameStylesSection = await Webpack.waitForModule(Webpack.Filters.byStrings('userDisplayNameStyles', 'guildDisplayNameStyles'), { signal: controller.signal });
+
+		if (this.DisplayNameSection && this.DisplayNameStylesSection && renderFn2) {
+			Patcher.after(this.DisplayNameSection, renderFn2, (_, [args], ret) => {
+				ret.props.children.splice(
+					1,
+					0,
+					React.createElement(this.DisplayNameStylesSection, {
+						user: args.user,
+						className: 'bd-marginTop24'
+					})
+				);
+			});
+		}
+	}
+	//#endregion
+
+	//#region Sharpen Streams
+	//Adds sharpness slider to stream context menu, and applies sharpness effect to stream tiles and PIP player. Shoutouts to @me4u._.day for their suggestion.
+	async sharpenStreams() {
+		ContextMenu.patch('stream-context', this.streamContextPatch);
+
+		this.VideoStream = await Webpack.waitForModule(Webpack.Filters.bySource('VideoStream', 'videoComponent'), { signal: controller.signal });
+
+		if (!this.VideoStream) return;
+		let videoStreamName = this.findMangledName(this.VideoStream, (x) => x.type?.toString?.().includes?.('VideoStream'));
+
+		if (videoStreamName) {
+			Patcher.after(this.VideoStream?.[videoStreamName], 'type', (_, [args], ret) => {
+				if (args?.userId) {
+					let percentNormal = 100;
+					let percentSharpened = 0;
+
+					if (settings.userSharpenPreferences?.[args.userId]) {
+						percentSharpened = settings.userSharpenPreferences[args.userId];
+						percentNormal = 100 - percentSharpened;
+					}
+
+					ret.props.children.push(
+						React.createElement('svg', {
+							children: React.createElement('filter', {
+								id: 'bd-svgSharpen-' + args.userId,
+								colorInterpolationFilters: 'sRGB',
+								children: [
+									React.createElement('feConvolveMatrix', {
+										order: '3',
+										kernelMatrix: '0 -1 0 -1 5 -1 0 -1 0',
+										result: 'sharpen'
+									}),
+									React.createElement('feComposite', {
+										in: 'SourceGraphic',
+										in2: 'sharpen',
+										operator: 'arithmetic',
+										result: 'userPreference',
+										k1: '0',
+										k2: percentNormal / 100,
+										k3: percentSharpened / 100,
+										k4: '0'
+									}),
+									React.createElement('feComposite', {
+										id: `bd-svgSharpen-${args.userId}-size`,
+										in: 'SourceGraphic',
+										in2: 'userPreference',
+										operator: 'arithmetic',
+										k1: '0',
+										k2: '1',
+										k3: '0',
+										k4: '0' //default to not changing anything but we change these values below
+									})
+								]
+							})
+						})
+					);
+
+					//I could have made this part work a bit better, but I don't feel like it right now honestly.
+					ret.props.children.push(
+						React.createElement(ResizeFindingElement, {
+							id: `bd-sharpen-resize-div-${args.userId}`,
+							onResize: (width, height) => {
+								//get the part of the filter that compares the user preference to the source graphic
+								const sizeOfStreamFilter = document.getElementById(`bd-svgSharpen-${args.userId}-size`);
+
+								//calculate tile's percentage of the screen
+								let heightOfStreamComparedToScreen = height / screen.height;
+
+								//if the user is focusing the stream and Discord is the maximized window, then this multiplication should get them to the full intensity
+								//(ensures that the intensity isn't always less than 100%)
+								let filterIntensityFactoringScreen = heightOfStreamComparedToScreen * 1.3;
+								if (filterIntensityFactoringScreen > 1) filterIntensityFactoringScreen = 1; //normalize value so it cant go over 100%
+
+								//apply new values
+								sizeOfStreamFilter.k3.baseVal = filterIntensityFactoringScreen.toString();
+								sizeOfStreamFilter.k2.baseVal = (1 - filterIntensityFactoringScreen).toString();
+							}
+						})
+					);
+
+					if (ret?.props?.children?.[0]?.props) ret.props.children[0].props.style = { filter: `url(#bd-svgSharpen-${args.userId})` };
+				}
+			});
+		}
+	}
+	//#endregion
+
+	//#region Sharpen PIP
+	sharpenPipPlayer() {
+		if (PictureInPicturePlayer) {
+			let pipPlayerName = this.findMangledName(PictureInPicturePlayer, (x) => x);
+			if (pipPlayerName) {
+				Patcher.after(PictureInPicturePlayer?.[pipPlayerName]?.prototype, 'render', (_, [args], ret) => {
+					nodePatcher.patch(ret, (_, props, res) => {
+						//this shit insane ngl
+						let finder = res._reactInternals;
+						let count = 0;
+						while (finder) {
+							if (finder?.pendingProps?.backgroundKey) break;
+							else {
+								finder = finder.child;
+								count++;
+								if (count > 100) return;
+							}
+						}
+						if (finder) {
+							nodePatcher.patch(finder, (args, ret) => {
+								const userId = args?.backgroundKey?.split?.(':')?.[3];
+								if (userId) {
+									if (userId != CurrentUser.id) {
+										let sharpnessPercent = 0;
+
+										if (settings.userSharpenPreferences?.[userId]) {
+											sharpnessPercent = settings.userSharpenPreferences[userId];
+										}
+										let normalPercent = 100 - sharpnessPercent;
+
+										// This is to change the intensity when the user changes the size of the PIP window.
+										// It only updates after they stop dragging the mouse, but it's not that big of a deal,
+										// since I doubt most people will even notice unless they're really paying attention, and I don't feel like changing it now
+										// PIP window is always at most 50% of the screen, so we take width of the PIP window and divide by the width of the screen
+										// to get the approximate percent of the screen that is covered by the stream
+										let widthOfStreamComparedToScreen = args.width / screen.width;
+
+										let filterIntensityFactoringScreen;
+										filterIntensityFactoringScreen = widthOfStreamComparedToScreen * 2; //then we double that since it's at most 50% of the screen
+										if (filterIntensityFactoringScreen > 1) filterIntensityFactoringScreen = 1; //and normalize it to at most 1
+										//and then we use this value to determine how much to sharpen the PIP window after the user's preference is considered in the second feComposite
+
+										ret.props.children.push(
+											React.createElement('svg', {
+												children: [
+													React.createElement('filter', {
+														id: 'bd-svgSharpen-' + userId + '-pip',
+														colorInterpolationFilters: 'sRGB',
+														children: [
+															React.createElement('feConvolveMatrix', {
+																order: '3',
+																kernelMatrix: '0 -0.5 0 -0.5 3 -0.5 0 -0.5 0', //weaker kernel than the CallTiles since the PIP is always smaller than them and we want them to be fairly close in perceived sharpness
+																result: 'sharpen'
+															}),
+															React.createElement('feComposite', {
+																in: 'SourceGraphic',
+																in2: 'sharpen',
+																operator: 'arithmetic',
+																k1: '0',
+																k2: normalPercent / 100,
+																k3: sharpnessPercent / 100,
+																k4: '0',
+																result: 'userPreference'
+															}),
+															React.createElement('feComposite', {
+																in: 'SourceGraphic',
+																in2: 'userPreference',
+																operator: 'arithmetic',
+																k1: '0',
+																k2: 1 - filterIntensityFactoringScreen,
+																k3: filterIntensityFactoringScreen,
+																k4: '0'
+															})
+														]
+													})
+												]
+											})
+										);
+
+										ret.props.style = { filter: `url(#bd-svgSharpen-${userId}-pip)` };
+									}
+								}
+							});
+						}
+					});
+				});
+			}
+		} else {
+			Logger.error('PictureInPicturePlayer not found!');
+		}
+	}
+	//#endregion
+
+	//#region Sharpen Context
+	streamContextPatch(reactElem, context) {
+		if (!settings.sharpenStreams) return;
+
+		if (reactElem?.props?.children?.props?.children?.[1]?.props?.children?.[0]?.props?.id == 'mute') {
+			//Makes the sharpness slider only appear on other user's stream while you are watching it
+			let userId = context.stream.ownerId;
+
+			if (userId) {
+				let initialValue = 0;
+
+				if (settings.userSharpenPreferences?.[userId]) {
+					initialValue = settings.userSharpenPreferences[userId];
+				}
+
+				const handleChange = (e) => {
+					let percentSharpness = parseInt(e);
+					let percentNormal = 100 - percentSharpness;
+
+					let filter = document.getElementById(`bd-svgSharpen-${userId}`);
+					if (filter) {
+						settings.userSharpenPreferences[userId] = percentSharpness;
+						let feComposite = filter?.children[1];
+						feComposite.k3.baseVal = (percentSharpness / 100).toString();
+						feComposite.k2.baseVal = (percentNormal / 100).toString();
+					}
+				};
+
+				const handleSave = () => {
+					Data.save('settings', settings);
+				};
+
+				reactElem.props.children.props.children.splice(
+					2,
+					0,
+					React.createElement(ContextMenu.Item, {
+						id: 'bd-sharpness-slider',
+						label: () =>
+							React.createElement(ContextMenuSlider, {
+								initialValue,
+								label: React.createElement(Components.Text, {
+									//Default label is the wrong size so this uses the text component lol
+									children: 'Sharpness',
+									style: {
+										fontSize: '14px',
+										fontWeight: 'var(--font-weight-medium)'
+									}
+								}),
+								asValueChanges: handleChange,
+								onValueChange: handleSave
+							})
+					})
+				);
+			}
+		}
+	}
+	//#endregion
+
+	//#region Extra Context
+	extraContextMenus() {
+		try {
+			ContextMenu.patch('expression-picker', this.expressionPickerFunction);
+		} catch (err) {
+			Logger.error(err);
+		}
+
+		try {
+			if (GIFPickerRender) {
+				Patcher.after(GIFPickerRender?.prototype, 'render', (thisRef, __, ret) => {
+					if (ret?.props) {
+						ret.props.onContextMenu = (e) => {
+							let url;
+							if (thisRef?.props?.item?.url) url = thisRef.props.item.url;
+							else url = thisRef.props.src;
+
+							if (url.startsWith('//')) {
+								url = 'https:' + url;
+							}
+
+							ContextMenu.open(
+								e,
+								ContextMenu.buildMenu([
+									{
+										type: 'text',
+										label: 'Copy Link',
+										onClick: () => {
+											copyToClipboard(url);
+										}
+									},
+									{
+										type: 'text',
+										label: 'Open Link',
+										onClick: () => {
+											window.open(url);
+										}
+									}
+								])
+							);
+						};
+					}
+				});
+			} else {
+				Logger.error('GIF Picker element was not found!');
+			}
+		} catch (err) {
+			Logger.error(err);
+		}
+	}
+	//#endregion
+
+	//#region Expression Picker Context
+	//GIF and Sticker Picker Context Menu
+	expressionPickerFunction(reactElem, context) {
+		//those variable names arent good but idk what else to call em lol
+
+		let src = context?.target?.src ? context?.target?.src : context?.target?.firstChild?.src;
+		if (src) {
+			if (src.includes('emojis')) {
+				let idFromUrlRegex = /(?<=emojis\/)(\d+?)(?=\.(png|webp|gif|avif|jpg|jpeg))/;
+				let emojiId = src.match(idFromUrlRegex)[0];
+				if (emojiId) {
+					let emoji = EmojiStore.getCustomEmojiById(emojiId);
+					if (emoji) {
+						if (!emoji.animated && settings.PNGemote) src = src.replace('.webp', '.png');
+						if (emoji.animated) {
+							src = src.replace('.webp', '.gif');
+							src = src.replace('.avif', '.gif');
+						}
+					}
+				}
+			}
+
+			src = src.split('?')[0] + '?size=4096';
+
+			try {
+				if (reactElem?.props?.children?.props?.children) {
+					//add copy url button only if the developer mode copy url isnt there already
+					if (reactElem.props.children.props.children.filter((x) => x?.props?.id == 'copy-image-link')?.length == 0) {
+						reactElem.props.children.props.children.push(
+							ContextMenu.buildItem({
+								id: 'bd-copy-url-expression-picker',
+								label: 'Copy URL',
+								action: () => {
+									copyToClipboard(src);
+								}
+							})
+						);
+					}
+					reactElem.props.children.props.children.push(
+						ContextMenu.buildItem({
+							id: 'bd-open-url-expression-picker',
+							label: 'Open URL',
+							action: () => {
+								window.open(src);
+							}
+						})
+					);
+				}
+			} catch (err) {
+				Logger.error(err);
+			}
+		}
+	}
+	//#endregion
+
+	//#region Utilities
+	// Finds and returns the key of an object in a module/object using a filter, and warns if there is a potential problem. Useful when patching lazy loaded modules.
+	// If filter variable is a string, it uses an includes string filter.
+	findMangledName(module, filter, debugInfo) {
+		if (module) {
+			if (typeof filter === 'string') {
+				filter = (x) => x.toString?.().includes?.(filter);
+			}
+			let keys = Object.keys(module);
+			let values = Object.values(module);
+
+			let index = values.findIndex(filter);
+
+			if (index >= 0) return keys[index];
+			else {
+				Logger.warn(`Couldn't find name from module for function ${debugInfo} because the filter returned no results.\nFilter: `, filter, '\n', module);
+				return null;
+			}
+		} else {
+			Logger.warn(`Couldn't find name from module for function ${debugInfo} because the module was undefined. This is not necessarily an error, it may be caused by lazy-loaded modules not being ready yet.`);
+			return null;
+		}
+	}
+
+	//this functionality was previously in getRevealedText, but it's been separated to allow it to be checked on its own
+	getRevealedTextPerServer(userId, shouldInclude) {
+		//per-server pronoun field check
+		const guildId = SelectedGuildStore.getGuildId();
+		if (guildId) {
+			let userGuildProfile = UserProfileStore.getGuildMemberProfile(userId, guildId);
+			if (userGuildProfile?.pronouns) {
+				if (userGuildProfile.pronouns.includes(shouldInclude)) {
+					let revealedText = this.secondsightifyRevealOnly(String(userGuildProfile.pronouns));
+					if (revealedText != undefined && revealedText != '') {
+						return revealedText;
+					}
+				}
+			}
+			//per-server bio check
+			if (userGuildProfile?.bio) {
+				if (userGuildProfile.bio.includes(shouldInclude)) {
+					let revealedText = this.secondsightifyRevealOnly(String(userGuildProfile.bio));
+					if (revealedText != undefined && revealedText != '') {
+						return revealedText;
+					}
+				}
+			}
+		}
+	}
 
 	//shouldInclude is a string containing the characters that the encoded text should contain
 	//that means that in order to check for "P{" for example, you check for the characters \uDB40\uDC50\uDB40\uDC7B since we're checking the encoded text
@@ -763,6 +2324,9 @@ module.exports = class BDNitro {
 	//if shouldInclude is blank, always return the revealed text if there is revealed text
 	getRevealedText(userId, shouldInclude = '') {
 		let revealedText = ''; //init variable
+
+		let perServer = this.getRevealedTextPerServer(userId, shouldInclude);
+		if (perServer != undefined && perServer != '') return perServer;
 
 		//get the user's profile from the cached user profiles
 		let userProfile = UserProfileStore.getUserProfile(userId);
@@ -781,8 +2345,16 @@ module.exports = class BDNitro {
 				}
 			}
 		}
-		//get Custom Status
-		let customStatusActivity = PresenceStore.findActivity(userId, (e) => e.name == 'Custom Status' || e.id == 'custom');
+
+		let customStatusActivity;
+		try {
+			//get Custom Status
+			//avoid using findActivity function due to conflict with ChatFilter (#290)
+			customStatusActivity = PresenceStore.getActivities(userId).find((e) => e.name == 'Custom Status' || e.id == 'custom');
+		} catch (err) {
+			Logger.error('Something went wrong getting custom status, oh god oh shit!', err);
+		}
+
 		//if the user has a custom status
 		if (customStatusActivity) {
 			//grab the text from the custom status
@@ -797,11 +2369,12 @@ module.exports = class BDNitro {
 			}
 		}
 	}
+	//#endregion
 
 	//#region Nameplates
 	// nameplate 3y3 format: n{asset/palette}
 	nameplates() {
-		Patcher.after(this.meta.name, UserStore, 'getUser', (_, [userId], ret) => {
+		Patcher.after(UserStore, 'getUser', (_, [userId], ret) => {
 			if (!ret || !userId) return;
 
 			let userNameplate = ret?.collectibles?.nameplate;
@@ -809,7 +2382,7 @@ module.exports = class BDNitro {
 			//if user has a nameplate
 			if (userNameplate) {
 				//filter out bad or existing nameplate
-				if (userNameplate.sku_id != 0 && userNameplate.sku_id != undefined && userNameplate.sku_id != null && data.nameplatesV2[userNameplate.skuId] == undefined) {
+				if (userNameplate.sku_id != 0 && userNameplate.sku_id != undefined && userNameplate.sku_id != null && data?.nameplatesV2?.[userNameplate.skuId] == undefined) {
 					//get shortened asset name
 					let nameplateAsset = userNameplate.asset.replace('nameplates/', '').replaceAll('/', '');
 					//create name for nameplate since it's not provided through getUser
@@ -846,311 +2419,26 @@ module.exports = class BDNitro {
 			//slice off the n{ and the ending }
 			let nameplate = firstMatch.slice(2, -1);
 			if (nameplate) {
-				let [asset, palette] = nameplate.split(',');
-				if (asset != undefined && palette != undefined) {
+				let [skuId, palette] = nameplate.split(',');
+				let asset = data.nameplatesV2[skuId]?.asset;
+
+				if (skuId != undefined && palette != undefined) {
 					if (ret.collectibles == undefined) ret.collectibles = {};
 					ret.collectibles.nameplate = {
-						asset: `nameplates/${asset}`,
+						asset,
 						palette,
-						sku_id: 0
+						skuId
 					};
 				}
 			}
 		});
-
-		const secondsightifyEncodeOnly = this.secondsightifyEncodeOnly;
-
-		//#region Nameplates UI
-		function NameplateList() {
-			let [query, setQuery] = React.useState('');
-
-			let nameplatesList = [];
-
-			if (!data?.nameplatesV2 || data?.nameplatesV2?.length < 1) {
-				return React.createElement('h1', {
-					children: 'No nameplates were found!',
-					style: {
-						color: 'red',
-						fontWeight: 'bold'
-					}
-				});
-			} else {
-				const listOfNameplatesBySku = Object.keys(data.nameplatesV2);
-				for (let i = 0; i < listOfNameplatesBySku.length; i++) {
-					let sku = listOfNameplatesBySku[i];
-					let nameplate = data.nameplatesV2[sku];
-					if (query != '' && !nameplate.name.toLowerCase().includes(query.toLowerCase())) {
-						continue;
-					}
-
-					nameplatesList.push(
-						React.createElement('div', {
-							children: React.createElement(NameplatePreview, {
-								user: CurrentUser,
-								isHighlighted: true,
-								nameplateData: {
-									imgAlt: nameplate.name,
-									src: `nameplates/${nameplate.asset}`,
-									palette: NameplatePalettes[nameplate.palette]
-								}
-							}),
-							style: {
-								borderRadius: '10px',
-								width: '95%',
-								marginLeft: 'auto',
-								marginRight: 'auto',
-								height: '42px',
-								marginTop: '10px',
-								position: 'relative',
-								top: '5px',
-								cursor: 'pointer'
-							},
-							onClick: () => {
-								//make 3y3 string
-								let strToEncode = `n{${nameplate.asset},${nameplate.palette}}`;
-								let encodedStr = secondsightifyEncodeOnly(strToEncode);
-
-								//copy to clipboard
-								try {
-									DiscordNative.clipboard.copy(' ' + encodedStr);
-									UI.showToast('3y3 copied to clipboard!', { type: 'info' });
-								} catch (err) {
-									UI.showToast('Failed to copy to clipboard!', { type: 'error', forceShow: true });
-									Logger.error('BDNitro', err);
-								}
-							},
-							title: nameplate.name
-						})
-					);
-				}
-				return React.createElement('div', {
-					children: [
-						React.createElement(Components.TextInput, {
-							value: query,
-							placeholder: 'Search...',
-							onChange: (input) => setQuery(input)
-						}),
-						React.createElement('br'),
-						React.createElement('div', {
-							children: nameplatesList
-						})
-					]
-				});
-			}
-		}
-
-		Patcher.after(this.meta.name, NameplateSectionMod, 'NameplateSection', (_, args, ret) => {
-			const ButtonsSection = ret.props.children.props.children;
-			ButtonsSection.push(
-				React.createElement('button', {
-					className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
-					style: {
-						marginLeft: '10px',
-						whiteSpace: 'nowrap'
-					},
-					children: 'Change Nameplate [BDNitro]',
-					onClick: () => {
-						UI.showConfirmationModal('Change Nameplate', React.createElement(NameplateList), { cancelText: '' });
-					}
-				})
-			);
-		});
-		//#endregion
 	}
 	//#endregion
-
-	// #region Resolution Swapper
-	async resolutionSwapper() {
-		if (!this.StreamSettingsPanelMod) {
-			await Webpack.waitForModule(Webpack.Filters.byStrings('StreamSettings: user cannot be undefined'), { defaultExport: false });
-			this.StreamSettingsPanelMod = Webpack.getMangled('StreamSettings: user cannot be undefined', {
-				GoLiveModal: Webpack.Filters.byStrings('StreamSettings: user cannot be undefined')
-			});
-		}
-
-		if (!this.FormModalClasses) this.FormModalClasses = Webpack.getByKeys('formItemTitleSlim', 'modalContent');
-
-		Patcher.after(this.meta.name, this.StreamSettingsPanelMod, 'GoLiveModal', (_, [args], ret) => {
-			//Only if the selected preset is "Custom"
-			if (args.selectedPreset === 3) {
-				//Preparations
-				const childrenOfParentOfQualityButtonsSection = ret?.props?.children?.props?.children?.props?.children[1]?.props?.children;
-				const streamQualityButtonsSection = childrenOfParentOfQualityButtonsSection[0]?.props?.children;
-
-				const resolutionButtonsSection = streamQualityButtonsSection[0]?.props;
-
-				const fpsButtonsSection = streamQualityButtonsSection[1]?.props;
-
-				//Resolution input
-				if (resolutionButtonsSection?.children) {
-					//make each section into arrays so we can add another element
-					if (!Array.isArray(resolutionButtonsSection.children)) resolutionButtonsSection.children = [resolutionButtonsSection.children];
-
-					const thirdResolutionButton = resolutionButtonsSection?.children[0]?.props?.buttons[2];
-
-					resolutionButtonsSection?.children?.push(
-						React.createElement('div', {
-							children: [
-								React.createElement('h1', {
-									children: 'CUSTOM RESOLUTION',
-									className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-								}),
-								React.createElement(Components.NumberInput, {
-									value: settings.CustomResolution,
-									min: -1,
-									onChange: (input) => {
-										input = parseInt(input);
-										if (isNaN(input)) input = 1440;
-										settings.CustomResolution = input;
-										//updates visual
-										thirdResolutionButton.value = input;
-										//sets values and saves to settings
-										this.customizeStreamButtons();
-										//simulate click on button -- serves to both select it and to make react re-render it.
-										thirdResolutionButton.onClick();
-									}
-								})
-							]
-						})
-					);
-				}
-
-				if (fpsButtonsSection?.children) {
-					fpsButtonsSection.children = [fpsButtonsSection.children];
-
-					const thirdFpsButton = fpsButtonsSection?.children[0]?.props?.buttons[2];
-
-					fpsButtonsSection?.children.push(
-						React.createElement('div', {
-							children: [
-								React.createElement('h1', {
-									children: 'CUSTOM FRAME RATE',
-									className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-								}),
-								React.createElement(Components.NumberInput, {
-									value: settings.CustomFPS,
-									min: -1,
-									onChange: (input) => {
-										input = parseInt(input);
-										if (isNaN(input)) input = 60;
-										settings.CustomFPS = input;
-										//updates visual
-										thirdFpsButton.value = input;
-										//sets values and saves to settings
-										this.customizeStreamButtons();
-										//simulate click on button -- serves to both select it and to make react re-render it.
-										thirdFpsButton.onClick();
-									}
-								})
-							]
-						})
-					);
-				}
-
-				if (settings.CustomBitrateEnabled) {
-					if (childrenOfParentOfQualityButtonsSection) {
-						childrenOfParentOfQualityButtonsSection.push(React.createElement('br'));
-
-						childrenOfParentOfQualityButtonsSection.push(
-							React.createElement(Components.SettingGroup, {
-								name: 'Bitrate',
-								collapsible: true,
-								shown: false,
-								children: [
-									//headers
-									React.createElement('div', {
-										style: {
-											display: 'flex',
-											width: '100%',
-											justifyContent: 'space-around'
-										},
-										children: [
-											React.createElement('h1', {
-												children: 'MIN',
-												style: {
-													marginBlock: '0 5px'
-												},
-												className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-											}),
-											React.createElement('h1', {
-												children: 'TARGET',
-												style: {
-													marginBlock: '0 5px'
-												},
-												className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-											}),
-											React.createElement('h1', {
-												children: 'MAX',
-												style: {
-													marginBlock: '0 5px'
-												},
-												className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-											})
-										]
-									}),
-									React.createElement('div', {
-										style: {
-											display: 'flex',
-											width: '100%',
-											justifyContent: 'space-around',
-											marginBottom: '5px'
-										},
-										children: [
-											React.createElement(Components.NumberInput, {
-												value: settings.minBitrate,
-												min: -1,
-												onChange: (input) => {
-													input = parseInt(input);
-													if (isNaN(input)) input = -1;
-													settings.minBitrate = input;
-													//save to settings
-													Data.save(this.meta.name, 'settings', settings);
-												}
-											}),
-											React.createElement(Components.NumberInput, {
-												value: settings.targetBitrate,
-												min: -1,
-												onChange: (input) => {
-													input = parseInt(input);
-													if (isNaN(input)) input = -1;
-													settings.targetBitrate = input;
-													//save to settings
-													Data.save(this.meta.name, 'settings', settings);
-												}
-											}),
-											React.createElement(Components.NumberInput, {
-												value: settings.maxBitrate,
-												min: -1,
-												onChange: (input) => {
-													input = parseInt(input);
-													if (isNaN(input)) input = -1;
-													settings.maxBitrate = input;
-													//save to settings
-													Data.save(this.meta.name, 'settings', settings);
-												}
-											})
-										]
-									})
-								]
-							})
-						);
-					}
-				}
-			}
-		});
-	}
 
 	//#region Go Live Modal V2
 	async resolutionSwapperV2() {
 		//wait for lazy loaded modules
-		await Webpack.waitForModule(Webpack.Filters.bySource('golivemodalv2'));
-		if (this.GoLiveModalMod == undefined)
-			this.GoLiveModalMod = Webpack.getMangled('golivemodalv2', {
-				goLiveModalV2: Webpack.Filters.byStrings('golivemodalv2')
-			});
-
-		await Webpack.waitForModule(Webpack.Filters.byKeys('streamOptionsButton', 'settingsIcon'));
-		if (this.SteamOptionsButtonClassesMod == undefined) this.SteamOptionsButtonClassesMod = Webpack.getByKeys('streamOptionsButton', 'settingsIcon');
+		if (this.GoLiveV2ModalMod == undefined) this.GoLiveV2ModalMod = await Webpack.waitForModule(Webpack.Filters.bySource('GO_LIVE_MODAL_V2', 'getUseSystemScreensharePicker', 'canStreamQuality'), { defaultExport: false, signal: controller.signal });
 
 		//the sign of janky code inbound
 		let GLMV2Opt = {
@@ -1161,214 +2449,229 @@ module.exports = class BDNitro {
 			maxBitrateToSet: undefined
 		};
 
-		Patcher.after(this.meta.name, this.GoLiveModalMod, 'goLiveModalV2', (_, args, ret) => {
-			//maybe the worst amalgamation in this whole plugin?
+		let goLiveModalV2FnName = this.findMangledName(this.GoLiveV2ModalMod, (x) => x, 'GoLiveModalV2');
+		if (goLiveModalV2FnName) {
+			Patcher.instead(this.GoLiveV2ModalMod, goLiveModalV2FnName, (_, [args], ogFunction) => {
+				let ret = ogFunction(args);
 
-			if (GLMV2Opt.resolutionToSet != undefined) {
-				ret.props.state.resolution = GLMV2Opt.resolutionToSet;
-				settings.CustomResolution = GLMV2Opt.resolutionToSet;
-				GLMV2Opt.resolutionToSet = undefined;
-			}
-			if (GLMV2Opt.fpsToSet != undefined) {
-				ret.props.state.fps = GLMV2Opt.fpsToSet;
-				settings.CustomFPS = GLMV2Opt.fpsToSet;
-				GLMV2Opt.fpsToSet = undefined;
-			}
+				//maybe the worst amalgamation in this whole plugin?
 
-			const ModalFooter = ret?.props?.children?.props?.children[2]?.props?.children[0]?.props?.children[1]?.props?.children;
+				if (GLMV2Opt.resolutionToSet != undefined) {
+					ret.props.state.resolution = GLMV2Opt.resolutionToSet;
+					settings.CustomResolution = GLMV2Opt.resolutionToSet;
+					GLMV2Opt.resolutionToSet = undefined;
+				}
+				if (GLMV2Opt.fpsToSet != undefined) {
+					ret.props.state.fps = GLMV2Opt.fpsToSet;
+					settings.CustomFPS = GLMV2Opt.fpsToSet;
+					GLMV2Opt.fpsToSet = undefined;
+				}
 
-			if (ModalFooter) {
-				ModalFooter.splice(
-					2,
-					0,
-					React.createElement('button', {
-						class: `${this.SteamOptionsButtonClassesMod.streamOptionsButton} ${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorPrimary} ${buttonClassModule.sizeIcon} ${buttonClassModule.grow}`,
-						style: {
-							height: '46px',
-							width: '46px'
-						},
-						children: 'YABD',
-						onClick: () => {
-							let localStreamOptions = {
-								resolutionToSet: undefined,
-								fpsToSet: undefined,
-								minBitrateToSet: undefined,
-								targetBitrateToSet: undefined,
-								maxBitrateToSet: undefined
-							};
+				let RightButtonGroup = ret?.props?.children?.props?.children?.props?.children?.[1]?.props?.children?.[0]?.props?.children?.[1]?.props;
 
-							//defaults
-							if (settings.ResolutionEnabled) localStreamOptions.resolutionToSet = settings.CustomResolution;
-							if (settings.CustomFPSEnabled) localStreamOptions.fpsToSet = settings.CustomFPS;
-							if (settings.CustomBitrateEnabled) {
-								localStreamOptions.minBitrateToSet = settings.minBitrate;
-								localStreamOptions.targetBitrateToSet = settings.targetBitrate;
-								localStreamOptions.maxBitrateToSet = settings.maxBitrate;
-							}
+				//add BD button
+				if (RightButtonGroup) {
+					RightButtonGroup.children.splice(
+						2,
+						0,
+						React.createElement('button', {
+							class: 'bd-resolution-swapper-v2-button',
+							children: 'BD',
+							onClick: () => {
+								let localStreamOptions = {
+									resolutionToSet: settings.CustomResolution, //set to apply on pressing Apply even if custom resolution/fps is disabled
+									fpsToSet: settings.CustomFPS, // -------------^
+									minBitrateToSet: undefined,
+									targetBitrateToSet: undefined,
+									maxBitrateToSet: undefined
+								};
 
-							UI.showConfirmationModal(
-								'Configure Stream Settings',
-								[
-									React.createElement('div', {
-										children: [
-											React.createElement('div', {
-												style: {
-													display: 'flex',
-													width: '100%',
-													justifyContent: 'space-around'
-												},
-												children: [
-													React.createElement('h1', {
-														children: 'Resolution',
-														className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-													}),
-													React.createElement('h1', {
-														children: 'FPS',
-														className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-													})
-												]
-											}),
-											React.createElement('div', {
-												style: {
-													display: 'flex',
-													width: '100%',
-													justifyContent: 'space-around'
-												},
-												children: [
-													React.createElement(Components.NumberInput, {
-														value: settings.CustomResolution,
-														min: -1,
-														onChange: (input) => {
-															input = parseInt(input);
-															if (isNaN(input)) input = 1440;
-
-															localStreamOptions.resolutionToSet = input;
-														}
-													}),
-													React.createElement(Components.NumberInput, {
-														value: settings.CustomFPS,
-														min: -1,
-														onChange: (input) => {
-															input = parseInt(input);
-															if (isNaN(input)) input = 60;
-
-															localStreamOptions.fpsToSet = input;
-														}
-													})
-												]
-											})
-										]
-									}),
-									settings.CustomBitrateEnabled ? React.createElement('br') : undefined,
-									settings.CustomBitrateEnabled
-										? React.createElement('h1', {
-												children: 'Custom Bitrate (kbps)',
-												className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-										  })
-										: undefined,
-									settings.CustomBitrateEnabled
-										? React.createElement('div', {
-												style: {
-													display: 'flex',
-													width: '100%',
-													justifyContent: 'space-around'
-												},
-												children: [
-													React.createElement('h1', {
-														children: 'Min',
-														style: {
-															marginBlock: '0 5px'
-														},
-														className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-													}),
-													React.createElement('h1', {
-														children: 'Target',
-														style: {
-															marginBlock: '0 5px'
-														},
-														className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-													}),
-													React.createElement('h1', {
-														children: 'Max',
-														style: {
-															marginBlock: '0 5px'
-														},
-														className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
-													})
-												]
-										  })
-										: undefined,
-									React.createElement('div', {
-										style: {
-											display: 'flex',
-											width: '100%',
-											justifyContent: 'space-around',
-											marginBottom: '5px'
-										},
-										children: settings.CustomBitrateEnabled
-											? [
-													React.createElement(Components.NumberInput, {
-														value: settings.minBitrate,
-														min: -1,
-														onChange: (input) => {
-															input = parseInt(input);
-															if (isNaN(input)) input = -1;
-															localStreamOptions.minBitrateToSet = input;
-														}
-													}),
-													React.createElement(Components.NumberInput, {
-														value: settings.targetBitrate,
-														min: -1,
-														onChange: (input) => {
-															input = parseInt(input);
-															if (isNaN(input)) input = -1;
-															localStreamOptions.targetBitrateToSet = input;
-														}
-													}),
-													React.createElement(Components.NumberInput, {
-														value: settings.maxBitrate,
-														min: -1,
-														onChange: (input) => {
-															input = parseInt(input);
-															if (isNaN(input)) input = -1;
-															localStreamOptions.maxBitrateToSet = input;
-														}
-													})
-											  ]
-											: undefined
-									})
-								],
-								{
-									confirmText: 'Apply',
-									onConfirm: () => {
-										GLMV2Opt = localStreamOptions;
-
-										if (localStreamOptions.minBitrateToSet != undefined) settings.minBitrate = localStreamOptions.minBitrateToSet;
-										if (localStreamOptions.targetBitrateToSet != undefined) settings.targetBitrate = localStreamOptions.targetBitrateToSet;
-										if (localStreamOptions.maxBitrateToSet != undefined) settings.maxBitrate = localStreamOptions.maxBitrateToSet;
-										Data.save(this.meta.name, 'settings', settings);
-									}
+								//defaults
+								if (settings.CustomBitrateEnabled) {
+									localStreamOptions.minBitrateToSet = settings.minBitrate;
+									localStreamOptions.targetBitrateToSet = settings.targetBitrate;
+									localStreamOptions.maxBitrateToSet = settings.maxBitrate;
 								}
-							);
-						}
-					})
-				);
-			}
-		});
+
+								UI.showConfirmationModal(
+									'Configure Stream Settings',
+									[
+										React.createElement('div', {
+											children: [
+												React.createElement('div', {
+													style: {
+														display: 'flex',
+														width: '100%',
+														justifyContent: 'space-around'
+													},
+													children: [
+														React.createElement('h1', {
+															children: 'Resolution',
+															className: `bd-text-h5`
+														}),
+														React.createElement('h1', {
+															children: 'FPS',
+															className: `bd-text-h5`
+														})
+													]
+												}),
+												React.createElement('div', {
+													style: {
+														display: 'flex',
+														width: '100%',
+														justifyContent: 'space-around'
+													},
+													children: [
+														React.createElement(Components.NumberInput, {
+															value: settings.CustomResolution,
+															min: -1,
+															onChange: (input) => {
+																input = parseInt(input);
+																if (isNaN(input)) input = 1440;
+
+																localStreamOptions.resolutionToSet = input;
+															}
+														}),
+														React.createElement(Components.NumberInput, {
+															value: settings.CustomFPS,
+															min: -1,
+															onChange: (input) => {
+																input = parseInt(input);
+																if (isNaN(input)) input = 60;
+
+																localStreamOptions.fpsToSet = input;
+															}
+														})
+													]
+												})
+											]
+										}),
+										settings.CustomBitrateEnabled ? React.createElement('br') : undefined,
+										settings.CustomBitrateEnabled
+											? React.createElement('h1', {
+													children: 'Custom Bitrate (kbps)',
+													className: `bd-text-h5`
+												})
+											: undefined,
+										settings.CustomBitrateEnabled
+											? React.createElement('div', {
+													style: {
+														display: 'flex',
+														width: '100%',
+														justifyContent: 'space-around'
+													},
+													children: [
+														React.createElement('h1', {
+															children: 'Min',
+															style: {
+																marginBlock: '0 5px'
+															},
+															className: `bd-text-h5`
+														}),
+														React.createElement('h1', {
+															children: 'Target',
+															style: {
+																marginBlock: '0 5px'
+															},
+															className: `bd-text-h5`
+														}),
+														React.createElement('h1', {
+															children: 'Max',
+															style: {
+																marginBlock: '0 5px'
+															},
+															className: `bd-text-h5`
+														})
+													]
+												})
+											: undefined,
+										React.createElement('div', {
+											style: {
+												display: 'flex',
+												width: '100%',
+												justifyContent: 'space-around',
+												marginBottom: '5px'
+											},
+											children: settings.CustomBitrateEnabled
+												? [
+														React.createElement(Components.NumberInput, {
+															value: settings.minBitrate,
+															min: -1,
+															onChange: (input) => {
+																input = parseInt(input);
+																if (isNaN(input)) input = -1;
+																localStreamOptions.minBitrateToSet = input;
+															}
+														}),
+														React.createElement(Components.NumberInput, {
+															value: settings.targetBitrate,
+															min: -1,
+															onChange: (input) => {
+																input = parseInt(input);
+																if (isNaN(input)) input = -1;
+																localStreamOptions.targetBitrateToSet = input;
+															}
+														}),
+														React.createElement(Components.NumberInput, {
+															value: settings.maxBitrate,
+															min: -1,
+															onChange: (input) => {
+																input = parseInt(input);
+																if (isNaN(input)) input = -1;
+																localStreamOptions.maxBitrateToSet = input;
+															}
+														})
+													]
+												: undefined
+										})
+									],
+									{
+										confirmText: 'Apply',
+										onConfirm: () => {
+											GLMV2Opt = localStreamOptions;
+
+											if (localStreamOptions.minBitrateToSet != undefined) settings.minBitrate = localStreamOptions.minBitrateToSet;
+											if (localStreamOptions.targetBitrateToSet != undefined) settings.targetBitrate = localStreamOptions.targetBitrateToSet;
+											if (localStreamOptions.maxBitrateToSet != undefined) settings.maxBitrate = localStreamOptions.maxBitrateToSet;
+											Data.save('settings', settings);
+										}
+									}
+								);
+							}
+						})
+					);
+
+					//remove SD/HD pill upsell
+					if (settings.removeScreenshareUpsell) {
+						RightButtonGroup.children = RightButtonGroup.children.filter((x) => !x.type?.toString?.()?.includes?.('pill'));
+					}
+				}
+
+				//Remove Nitro upsell
+				if (settings.removeScreenshareUpsell) {
+					const footer = ret?.props?.children?.props?.children?.props?.children?.[1]?.props;
+					if (footer?.children) {
+						footer.children = footer.children[0];
+					}
+				}
+
+				return ret;
+			});
+		}
 	}
 	// #endregion
 
 	unlockStickers() {
-		Patcher.instead(this.meta.name, stickerSendabilityModule, 'getStickerSendability', () => {
+		Patcher.instead(stickerSendabilityModule, 'getStickerSendability', () => {
 			return 0; //SENDABLE
 		});
-		Patcher.instead(this.meta.name, stickerSendabilityModule, 'isSendableSticker', () => {
+		Patcher.instead(stickerSendabilityModule, 'isSendableSticker', () => {
 			return true;
 		});
 	}
 
 	videoCodecs() {
-		Patcher.after(this.meta.name, streamSettingsMod, 'getCodecOptions', (_, args, ret) => {
+		Patcher.after(streamSettingsMod?.Connection?.prototype, 'getCodecOptions', (_, args, ret) => {
 			ret.videoEncoder = ret.videoDecoders[settings.videoCodec2];
 		});
 	}
@@ -1376,18 +2679,21 @@ module.exports = class BDNitro {
 	// #region Clips Bypasses
 	async clipsBypass() {
 		if (settings.enableClipsExperiment) {
-			this.experiments();
-			this.overrideExperiment('2023-09_clips_nitro_early_access', 2);
-			this.overrideExperiment('2022-11_clips_experiment', 1);
-			this.overrideExperiment('2023-10_viewer_clipping', 1);
+			this.overrideVariant('2026-03-clips-experiment', 2);
 		}
+
 		//spoof nitro file size limit
-		Patcher.instead(this.meta.name, MaxFileSizeMod, 'getMaxFileSize', (_, args) => {
-			return 500 * 1024 * 1024; //512 MB
+		Patcher.instead(MaxFileSizeMod, 'getMaxFileSize', (_, [serverId], originalFunction) => {
+			let originalOutput = originalFunction(serverId);
+			if (ORIGINAL_NITRO_STATUS === 2) {
+				return 500 * 1024 * 1024; //500 MB
+			} else {
+				return Math.max(100 * 1024 * 1024, originalOutput); //100 MB or server's file size if greater
+			}
 		});
 
 		//disable max file size message
-		Patcher.instead(this.meta.name, MaxFileSizeMod, 'exceedsMessageSizeLimit', (_, args) => {
+		Patcher.instead(MaxFileSizeMod, 'exceedsMessageSizeLimit', (_, args) => {
 			return false;
 		});
 
@@ -1395,50 +2701,31 @@ module.exports = class BDNitro {
 		// currently they use useExperiment to check if they should appear, which is a function that I can't patch
 		// and remaking the respective React elements sounds really difficult
 
-		//base64 for file clipping mp4
-		const clipMe =
-			'AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAABbBtb292AAAAbG12aGQAAAAAAAAAAAAAAAAAAAPoAAAAyAABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAACUXRyYWsAAABcdGtoZAAAAAMAAAAAAAAAAAAAAAEAAAAAAAAAyAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAMgAAADIAAAAAACRlZHRzAAAAHGVsc3QAAAAAAAAAAQAAAMgAAAAAAAEAAAAAAcltZGlhAAAAIG1kaGQAAAAAAAAAAAAAAAAAADIAAAAKAFXEAAAAAAAtaGRscgAAAAAAAAAAdmlkZQAAAAAAAAAAAAAAAFZpZGVvSGFuZGxlcgAAAAF0bWluZgAAABR2bWhkAAAAAQAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAABNHN0YmwAAADAc3RzZAAAAAAAAAABAAAAsG1wNHYAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAMgAyAEgAAABIAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY//8AAAAsZXNkcwAAAAADgICAGwABAASAgIANbBEAAAAAAMmQAADJkAaAgIABAgAAAApmaWVsAQAAAAAQcGFzcAAAAAEAAAABAAAAFGJ0cnQAAAAAAADJkAAAyZAAAAAYc3R0cwAAAAAAAAABAAAABQAAAgAAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAFHN0c3oAAAAAAAABAgAAAAUAAAAkc3RjbwAAAAAAAAAFAAAF8QAABvsAAAgFAAAJDwAAChUAAAKJdHJhawAAAFx0a2hkAAAAAwAAAAAAAAAAAAAAAgAAAAAAAAC6AAAAAAAAAAAAAAABAQAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAJGVkdHMAAAAcZWxzdAAAAAAAAAABAAAAuQAABAAAAQAAAAACAW1kaWEAAAAgbWRoZAAAAAAAAAAAAAAAAAAArEQAACPfVcQAAAAAAC1oZGxyAAAAAAAAAABzb3VuAAAAAAAAAAAAAAAAU291bmRIYW5kbGVyAAAAAaxtaW5mAAAAEHNtaGQAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAXBzdGJsAAAAfnN0c2QAAAAAAAAAAQAAAG5tcDRhAAAAAAAAAAEAAAAAAAAAAAACABAAAAAArEQAAAAAADZlc2RzAAAAAAOAgIAlAAIABICAgBdAFQAAAAAAB/QAAAf0BYCAgAUSCFblAAaAgIABAgAAABRidHJ0AAAAAAAAB/QAAAf0AAAAIHN0dHMAAAAAAAAAAgAAAAgAAAQAAAAAAQAAA98AAAA0c3RzYwAAAAAAAAADAAAAAQAAAAEAAAABAAAAAgAAAAIAAAABAAAABQAAAAEAAAABAAAAOHN0c3oAAAAAAAAAAAAAAAkAAAAVAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAoc3RjbwAAAAAAAAAGAAAF3AAABvMAAAf9AAAJBwAAChEAAAsXAAAAGnNncGQBAAAAcm9sbAAAAAIAAAAB//8AAAAcc2JncAAAAAByb2xsAAAAAQAAAAkAAAABAAAAYnVkdGEAAABabWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OS4yNy4xMDAAAAAIZnJlZQAABUdtZGF03gIATGF2YzU5LjM3LjEwMAACMEAO/9j/4AAQSkZJRgABAgAAAQABAAD//gAQTGF2YzU5LjM3LjEwMAD//gAMQ1M9SVRVNjAxAP/bAEMACAQEBAQEBQUFBQUFBgYGBgYGBgYGBgYGBgcHBwgICAcHBwYGBwcICAgICQkJCAgICAkJCgoKDAwLCw4ODhERFP/EAEsAAQEAAAAAAAAAAAAAAAAAAAAHAQEAAAAAAAAAAAAAAAAAAAAAEAEAAAAAAAAAAAAAAAAAAAAAEQEAAAAAAAAAAAAAAAAAAAAA/8AAEQgAMgAyAwEiAAIRAAMRAP/aAAwDAQACEQMRAD8Ah4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/ZARggBwEYIAf/2P/gABBKRklGAAECAAABAAEAAP/+ABBMYXZjNTkuMzcuMTAwAP/+AAxDUz1JVFU2MDEA/9sAQwAIBAQEBAQFBQUFBQUGBgYGBgYGBgYGBgYGBwcHCAgIBwcHBgYHBwgICAgJCQkICAgICQkKCgoMDAsLDg4OEREU/8QASwABAQAAAAAAAAAAAAAAAAAAAAcBAQAAAAAAAAAAAAAAAAAAAAAQAQAAAAAAAAAAAAAAAAAAAAARAQAAAAAAAAAAAAAAAAAAAAD/wAARCAAyADIDASIAAhEAAxEA/9oADAMBAAIRAxEAPwCHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/9kBGCAHARggB//Y/+AAEEpGSUYAAQIAAAEAAQAA//4AEExhdmM1OS4zNy4xMDAA//4ADENTPUlUVTYwMQD/2wBDAAgEBAQEBAUFBQUFBQYGBgYGBgYGBgYGBgYHBwcICAgHBwcGBgcHCAgICAkJCQgICAgJCQoKCgwMCwsODg4RERT/xABLAAEBAAAAAAAAAAAAAAAAAAAABwEBAAAAAAAAAAAAAAAAAAAAABABAAAAAAAAAAAAAAAAAAAAABEBAAAAAAAAAAAAAAAAAAAAAP/AABEIADIAMgMBIgACEQADEQD/2gAMAwEAAhEDEQA/AIeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/2QEYIAcBGCAH/9j/4AAQSkZJRgABAgAAAQABAAD//gAQTGF2YzU5LjM3LjEwMAD//gAMQ1M9SVRVNjAxAP/bAEMACAQEBAQEBQUFBQUFBgYGBgYGBgYGBgYGBgcHBwgICAcHBwYGBwcICAgICQkJCAgICAkJCgoKDAwLCw4ODhERFP/EAEsAAQEAAAAAAAAAAAAAAAAAAAAHAQEAAAAAAAAAAAAAAAAAAAAAEAEAAAAAAAAAAAAAAAAAAAAAEQEAAAAAAAAAAAAAAAAAAAAA/8AAEQgAMgAyAwEiAAIRAAMRAP/aAAwDAQACEQMRAD8Ah4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/ZARggB//Y/+AAEEpGSUYAAQIAAAEAAQAA//4AEExhdmM1OS4zNy4xMDAA//4ADENTPUlUVTYwMQD/2wBDAAgEBAQEBAUFBQUFBQYGBgYGBgYGBgYGBgYHBwcICAgHBwcGBgcHCAgICAkJCQgICAgJCQoKCgwMCwsODg4RERT/xABLAAEBAAAAAAAAAAAAAAAAAAAABwEBAAAAAAAAAAAAAAAAAAAAABABAAAAAAAAAAAAAAAAAAAAABEBAAAAAAAAAAAAAAAAAAAAAP/AABEIADIAMgMBIgACEQADEQD/2gAMAwEAAhEDEQA/AIeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/2QEYIAcAAABZbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAsaWxzdAAAACSpdG9vAAAAHGRhdGEAAAABAAAAAExhdmY2MS4zLjEwMwAALi51dWlkochSmTNGTbiI8IP1enWl7w==';
-
-		//convert base64 to ArrayBuffer
-		var binaryString = atob(clipMe);
-		var bytes = new Uint8Array(binaryString.length);
-		for (var i = 0; i < binaryString.length; i++) {
-			bytes[i] = binaryString.charCodeAt(i);
-		}
-		const clipMaBuffer = bytes.buffer;
-
-		if (!this.MP4Box) {
-			try {
-				await Webpack.getByStrings('mp4boxInputFile.boxes')();
-			} catch (e) {}
-			this.MP4Box = await Webpack.waitForModule(Webpack.Filters.byKeys('MP4BoxStream'));
-		}
 		if (ffmpeg == undefined) await this.loadFFmpeg();
 
 		async function ffmpegTransmux(arrayBuffer, inFileName = 'input.mp4', ffmpegArguments, outFileName = 'output.mp4') {
 			if (ffmpeg) {
-				if (!ffmpegArguments) ffmpegArguments = ['-i', inFileName, '-codec', 'copy', '-brand', 'isom/avc1', '-movflags', '+faststart', '-map', '0', '-map_metadata', '-1', '-map_chapters', '-1', outFileName];
-
-				await ffmpeg.writeFile(inFileName, new Uint8Array(arrayBuffer));
+				if (!ffmpegArguments) ffmpegArguments = ['-i', inFileName, '-c:v', 'copy', '-c:a', 'copy', '-c:s', 'mov_text', '-dn', '-brand', 'isom/avc1', '-movflags', '+faststart', '-map', '0', '-map_metadata', '-1', '-map_chapters', '-1', '-map', '-0:t', '-strict', '-2', outFileName];
+				if (arrayBuffer && inFileName) {
+					await ffmpeg.writeFile(inFileName, new Uint8Array(arrayBuffer));
+				}
 				console.log('Approximately equivalent ffmpeg command:');
 				console.log('ffmpeg ' + ffmpegArguments.join(' '));
 				await ffmpeg.exec(ffmpegArguments);
 				const data = await ffmpeg.readFile(outFileName);
 
-				ffmpeg.deleteFile(inFileName);
-				ffmpeg.deleteFile(outFileName);
+				if (inFileName) ffmpeg.deleteFile(inFileName);
+				if (outFileName) ffmpeg.deleteFile(outFileName);
 
 				if (data.length == 0) {
-					throw new Error(`An error occurred during muxing/encoding: Output file ended up empty or doesn't exist,
-                                    likely due to an FFmpeg error. Please check the FFmpeg logs above. If you need assistance,
-                                    please use the support channel in the Discord server.`);
+					throw new Error("An error occurred during muxing/encoding: Output file ended up empty or doesn't exist, " + 'likely due to an FFmpeg error. Please check the FFmpeg logs above. ' + 'If you need assistance, please use the support channel in the Discord server.');
 				}
 
 				return data.buffer;
 			} else throw new Error(`Can't mux/encode: ffmpeg is not loaded!`);
 		}
 		async function ffmpegAudioTransmux(arrayBuffer, inFileName = 'input.mp3', outFileName = 'output.mp4') {
-			let ffmpegArgs = ['-f', 'lavfi', '-i', 'color=c=black:s=400x50', '-i', inFileName, '-shortest', '-fflags', '+shortest', '-brand', 'isom/avc1', '-movflags', '+faststart', '-map_metadata', '-1', '-map_chapters', '-1', '-preset', 'ultrafast', '-c:a', 'copy', '-strict', '-2', '-tune', 'stillimage', '-r', '1', outFileName];
+			let ffmpegArgs = ['-f', 'lavfi', '-i', 'color=c=black:s=300x100', '-i', inFileName, '-shortest', '-fflags', '+shortest', '-brand', 'isom/avc1', '-movflags', '+faststart', '-map_metadata', '-1', '-dn', '-map_chapters', '-1', '-preset', 'ultrafast', '-c:a', 'copy', '-strict', '-2', '-tune', 'stillimage', '-r', '1', outFileName];
 
 			return await ffmpegTransmux(arrayBuffer, inFileName, ffmpegArgs, outFileName);
 		}
@@ -1446,7 +2733,7 @@ module.exports = class BDNitro {
 		const skippedAudioTypes = ['audio/mid', 'audio/basic', 'audio/mpegurl', 'audio/3gp'];
 		const skippedVideoTypes = ['video/3gp', 'video/asf', 'video/ivf'];
 
-		Patcher.instead(this.meta.name, addFilesMod, 'addFiles', async (_, [args], originalFunction) => {
+		Patcher.instead(addFilesMod, 'addFiles', async (_, [args], originalFunction) => {
 			/* If ffmpeg isn't loaded, or was unloaded for some reason,
                when the user adds a file, make sure to load it again if it's undefined
                If we don't do this check, then the user would have to
@@ -1454,14 +2741,29 @@ module.exports = class BDNitro {
                make ffmpeg load if it wasn't loaded properly the first time. */
 			if (ffmpeg == undefined) await this.loadFFmpeg();
 
-			function errorHandler(err, currentFile, name) {
+			//load append data only on first added file
+			if (!udta || !udtaBuffer) {
+				udta = new Uint8Array([
+					0, 0, 0, 89, 109, 101, 116, 97, 0, 0, 0, 0, 0, 0, 0, 33, 104, 100, 108, 114, 0, 0, 0, 0, 0, 0, 0, 0, 109, 100, 105, 114, 97, 112, 112, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 105, 108, 115, 116, 0, 0, 0, 36, 169, 116, 111, 111, 0, 0, 0, 28, 100, 97, 116, 97, 0, 0, 0, 1, 0, 0, 0, 0, 76, 97, 118, 102, 54, 49, 46, 51, 46, 49, 48, 51, 0, 0, 46, 46, 117, 117, 105, 100, 161, 200, 82, 153, 51, 70, 77, 184,
+					136, 240, 131, 245, 122, 117, 165, 239
+				]);
+				udtaBuffer = udta.buffer;
+			}
+
+			function errorHandler(err, currentFile) {
 				UI.showToast('Something went wrong. See console for details.', { type: 'error', forceShow: true });
-				Logger.error(name, err);
+				Logger.error(err);
 				if (currentFile) {
-					Logger.info(name, 'Current file information for debugging:');
-					Logger.info(name, currentFile);
-					Logger.info(name, `File Type: "${currentFile.file?.type}"`);
+					Logger.info('Current file information for debugging:', currentFile);
+					Logger.info(`File Type: "${currentFile.file?.type}"`);
 				}
+			}
+
+			function concatArrayBuffers(buf1, buf2) {
+				let newArray = new Uint8Array(buf1.byteLength + buf2.byteLength);
+				newArray.set(new Uint8Array(buf1), 0);
+				newArray.set(new Uint8Array(buf2), buf1.byteLength);
+				return newArray.buffer;
 			}
 
 			//for each file being added
@@ -1471,7 +2773,7 @@ module.exports = class BDNitro {
 				if (currentFile.file.name.endsWith('.dlfc')) return;
 
 				const clipData = {
-					id: '',
+					id: 0,
 					version: 3,
 					applicationName: '',
 					applicationId: '1301689862256066560',
@@ -1483,88 +2785,28 @@ module.exports = class BDNitro {
 					name: currentFile.file.name.substring(0, currentFile.file.name.lastIndexOf('.'))
 				};
 
-				// #region MP4 Clip
-				//larger than 10mb or force video clip enabled AND video clip bypass enabled AND is a video file AND is not a video type to skip
-				if ((currentFile.file.size > 10485759 || settings.forceClip) && settings.useClipBypass && currentFile.file.type.startsWith('video/') && !skippedVideoTypes.includes(currentFile.file.type)) {
-					//if this file is an mp4 file
-					if (currentFile.file.type == 'video/mp4') {
-						let dontStopMeNow = true;
-						let mp4BoxFile = this.MP4Box.createFile();
-						mp4BoxFile.onError = (e) => {
-							Logger.error(this.meta.name, e);
-							dontStopMeNow = false;
-						};
-						mp4BoxFile.onReady = async (info) => {
-							mp4BoxFile.flush();
+				switch (settings.clipTimestamp) {
+					default:
+					case 0: //January 1st, 2015
+						clipData.id = 0;
+						clipData.createdAt = 1420070400000;
+						break;
+					case 1: //Current Time
+						clipData.id = (BigInt(Date.now()) - 1420070400000n) << 22n;
+						clipData.createdAt = Date.now();
+						break;
+					case 2: //Last Modified Date
+						clipData.id = (BigInt(currentFile.file.lastModified) - 1420070400000n) << 22n;
+						clipData.createdAt = currentFile.file.lastModified;
+						break;
+				}
 
-							try {
-								//check if file is H264 or H265
-								if (info.videoTracks[0]?.codec?.startsWith('avc') || info.videoTracks[0]?.codec?.startsWith('hev1')) {
-									let hasTransmuxed = false;
-									if (!info.brands.includes('avc1') || info.brands.includes('mp42') || settings.alwaysTransmuxClips) {
-										arrayBuffer = await ffmpegTransmux(arrayBuffer, currentFile.file.name);
-										hasTransmuxed = true;
-									}
-
-									let isMetadataPresent = false;
-
-									//skip if we transmuxed since we know it won't have the tag
-									if (!hasTransmuxed) {
-										//Is this file already a Discord clip?
-										for (let j = 0; j < mp4BoxFile.boxes.length; j++) {
-											if (mp4BoxFile.boxes[j].type == 'uuid') {
-												isMetadataPresent = true;
-											}
-										}
-									}
-
-									//If this file is not a Discord clip, append udtaBuffer
-									if (!isMetadataPresent) {
-										let array1 = ArrayBuffer.concat(arrayBuffer, udtaBuffer);
-
-										let video = new File([new Uint8Array(array1)], currentFile.file.name, { type: 'video/mp4' });
-
-										currentFile.file = video;
-									}
-								} else {
-									//file is not H264 or H265, but is an mp4
-									arrayBuffer = await ffmpegTransmux(arrayBuffer, currentFile.file.name);
-									let array1 = ArrayBuffer.concat(arrayBuffer, udtaBuffer);
-									let video = new File([new Uint8Array(array1)], currentFile.file.name, { type: 'video/mp4' });
-
-									currentFile.file = video;
-								}
-
-								//send as a "clip"
-								currentFile.clip = clipData;
-							} catch (err) {
-								errorHandler(err, currentFile, this.meta.name);
-							} finally {
-								dontStopMeNow = false;
-							}
-						};
-
-						let arrayBuffer;
-						currentFile.file.arrayBuffer().then((obj) => {
-							arrayBuffer = obj;
-							arrayBuffer.fileStart = 0;
-							//examine file with mp4Box.
-							mp4BoxFile.appendBuffer(arrayBuffer);
-							//onReady will run after the buffer is appended successfully
-						});
-
-						//wait for onReady to finish
-						while (dontStopMeNow) {
-							await new Promise((r) => setTimeout(r, 10));
-						}
-					}
-					// #endregion
-					// #region Other Video Clip
-					else if (currentFile.file.name.toLowerCase().endsWith('.mod') && currentFile.file.type == 'video/mpeg') {
+				// #region Video Clip
+				//larger than 10mb or force video clip enabled AND video clip bypass enabled AND is a video file AND is not a video type to skip AND is less than or equal to 100mb
+				if ((currentFile.file.size > 10485759 || settings.forceClip) && settings.useClipBypass && currentFile.file.type.startsWith('video/') && !skippedVideoTypes.includes(currentFile.file.type) && currentFile.file.size <= 104857590) {
+					if (currentFile.file.name.toLowerCase().endsWith('.mod') && currentFile.file.type == 'video/mpeg') {
 						continue;
 					} else {
-						//Is a video file, but not MP4
-
 						let outFileName = 'output.mp4';
 
 						//AVI file warning
@@ -1575,12 +2817,12 @@ module.exports = class BDNitro {
 							let arrayBuffer = await currentFile.file.arrayBuffer();
 							const movTypes = ['video/flv', 'video/ogg', 'video/wmv', 'video/mov'];
 							if (movTypes.includes(currentFile.file.type)) {
-								Logger.info(this.meta.name, 'Using MOV format for clip.');
+								Logger.info('Using MOV format for clip.');
 
 								outFileName = 'output.mov';
 							}
 
-							let array1 = ArrayBuffer.concat(await ffmpegTransmux(arrayBuffer, currentFile.file.name, undefined, outFileName), udtaBuffer);
+							let array1 = concatArrayBuffers(await ffmpegTransmux(arrayBuffer, currentFile.file.name, undefined, outFileName), udtaBuffer);
 
 							let video = new File([new Uint8Array(array1)], currentFile.file.name.substr(0, currentFile.file.name.lastIndexOf('.')) + '.mp4', { type: 'video/mp4' });
 
@@ -1589,29 +2831,29 @@ module.exports = class BDNitro {
 							//send as a "clip"
 							currentFile.clip = clipData;
 						} catch (err) {
-							errorHandler(err, currentFile, this.meta.name);
+							errorHandler(err, currentFile);
 							continue;
 						}
 					}
 					//#endregion
 				}
 				// #region Audio Clip
-				//Audio file above 10mb or Force Audio Clip and it not an incompatible type and useAudioClipBypass is true
-				else if (settings.useAudioClipBypass && (currentFile.file.size > 10485759 || settings.forceAudioClip) && currentFile.file.type.startsWith('audio/') && !skippedAudioTypes.includes(currentFile.file.type)) {
+				//Audio file above 10mb or Force Audio Clip and it not an incompatible type and useAudioClipBypass is true and file below 100mb
+				else if (settings.useAudioClipBypass && (currentFile.file.size > 10485759 || settings.forceAudioClip) && currentFile.file.type.startsWith('audio/') && !skippedAudioTypes.includes(currentFile.file.type) && currentFile.file.size <= 104857590) {
 					try {
 						let arrayBuffer = await currentFile.file.arrayBuffer();
 
 						let outFileName = 'output.mp4';
 
-						if (['audio/wav', 'audio/aiff', 'audio/x-ms-wma'].includes(currentFile.file.type)) {
-							Logger.info('BDNitro', 'Using MOV format for audio clip.');
+						if (['audio/wav', 'audio/aiff', 'audio/x-ms-wma', 'audio/mpeg'].includes(currentFile.file.type)) {
+							Logger.info('Using MOV format for audio clip.');
 							outFileName = 'output.mov';
 						}
 						if (currentFile.file.type == 'audio/vnd.dolby.dd-raw') {
-							UI.showToast('AC3 should send but playback is not supported!', { type: 'warn' });
+							UI.showToast('AC3 will send but playback is only supported on mobile!', { type: 'warn' });
 						}
 
-						let array1 = ArrayBuffer.concat(await ffmpegAudioTransmux(arrayBuffer, currentFile.file.name, outFileName), udtaBuffer);
+						let array1 = concatArrayBuffers(await ffmpegAudioTransmux(arrayBuffer, currentFile.file.name, outFileName), udtaBuffer);
 
 						let video = new File([new Uint8Array(array1)], clipData.name + '.mp4', { type: 'video/mp4' });
 
@@ -1620,7 +2862,7 @@ module.exports = class BDNitro {
 						//send as a "clip"
 						currentFile.clip = clipData;
 					} catch (err) {
-						errorHandler(err, currentFile, this.meta.name);
+						errorHandler(err, currentFile);
 						continue;
 					}
 				}
@@ -1629,133 +2871,140 @@ module.exports = class BDNitro {
 				// #region File Clip
 
 				//any file above 10mb and below 100mb that does not fit any previous criteria
-				else if (currentFile.file.size > 10485759 && currentFile.file.size < 104857590 && settings.zipClip) {
-					const archiveMimeTypes = ['x-7z-compressed', 'x-bzip', 'x-bzip2', 'x-rar-compressed', 'x-tar', 'gzip', 'x-gzip', 'zip', 'x-zip-compressed'];
+				else if (currentFile.file.size >= 10485759 && currentFile.file.size <= 104857590 && settings.zipClip) {
+					//Calculate crcTable only once it's necessary
+					if (crcTable == undefined) {
+						crcTable = Array.from({ length: 256 }, (_, i) => Array.from({ length: 8 }, (_, j) => j).reduce((crc) => (crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1), i));
+					}
 
-					let zipFile;
-					let fileArrayBuffer = await currentFile.file.arrayBuffer();
+					//generate clipMaBuffer
+					if (!clipMaBuffer) {
+						let ffmpegArgs = ['-f', 'lavfi', '-i', 'color=c=black:s=128x96:duration=1', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono', '-shortest', '-fflags', '+shortest', '-brand', 'isom/avc1', '-movflags', '+faststart', '-map_metadata', '-1', '-preset', 'ultrafast', '-vframes', '5', '-c:v', 'mjpeg', 'output.mp4'];
 
-					//if the file has an archive mime type or is a .001 through .999 part file. technically also would work with more than 999 parts but i dont think it goes that high lol
-					if (archiveMimeTypes.includes(currentFile.file.type.replace('application/', '')) || parseInt(currentFile.file.name.substring(currentFile.file.name.lastIndexOf('.') + 1, currentFile.file.name.length)) > 0) {
-						zipFile = fileArrayBuffer;
-						clipData.name = currentFile.file.name;
-					} else {
-						/* DeepSeek-R1 helped to write this createZip function.
-                        Don't worry, I'm not completely stupid, I understand what the code does, how it works, and made sure to optimize it.
-                        I was just not feeling like learning the ins and outs of the zip format totally from scratch. Sue me.
-                        An explanation of the function is below (yes I wrote the explanation):
-                        The function creates a basic zip file containing the data variable as a file with no compression and returns a Uint8Array of the zip file.
-                        The name variable is the file name of the file within the zip.
-                        The data variable can be ArrayBuffer, Uint8Array, or string.
-                        To make a zip file, a bunch of headers and data descriptors, including a CRC checksum and a bunch of info about the file, must be created, so that's what we're doing.
-                        https://en.wikipedia.org/wiki/ZIP_(file_format)#File_headers for more information on that.
-                        Writing all this shit would've been pretty tedious so yea. */
-						function createZip(name, data) {
-							// Convert input to Uint8Array
-							const enc = new TextEncoder();
-							const nameBytes = enc.encode(name);
-							const dataBytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data instanceof Uint8Array ? data : enc.encode(data);
+						clipMaBuffer = await ffmpegTransmux(undefined, '', ffmpegArgs, 'output.mp4');
+						clipMaBuffer = concatArrayBuffers(clipMaBuffer, udtaBuffer);
+					}
 
-							// Calculate CRC and lengths
-							let crc = -1; // Initial value
-							const len = dataBytes.length;
+					if (clipMaBuffer) {
+						const archiveMimeTypes = ['x-7z-compressed', 'x-bzip', 'x-bzip2', 'x-rar-compressed', 'x-tar', 'gzip', 'x-gzip', 'zip', 'x-zip-compressed'];
 
-							// Process bytes in chunks
-							for (let i = 0; i < len; i++) {
-								crc = (crc >>> 8) ^ crcTable[(crc ^ dataBytes[i]) & 0xff];
+						let zipFile;
+						let fileArrayBuffer = await currentFile.file.arrayBuffer();
+
+						//if the file has an archive mime type or is a .001 through .999 part file. technically also would work with more than 999 parts but i dont think it goes that high lol
+						if (archiveMimeTypes.includes(currentFile.file.type.replace('application/', '')) || parseInt(currentFile.file.name.substring(currentFile.file.name.lastIndexOf('.') + 1, currentFile.file.name.length)) > 0) {
+							zipFile = fileArrayBuffer;
+							clipData.name = currentFile.file.name;
+						} else {
+							/* DeepSeek-R1 helped to write this createZip function.
+                            Don't worry, I'm not completely stupid, I understand what the code does, how it works, and made sure to optimize it.
+                            I was just not feeling like learning the ins and outs of the zip format totally from scratch. Sue me.
+                            An explanation of the function is below (yes I wrote the explanation):
+                            The function creates a basic zip file containing the data variable as a file with no compression and returns a Uint8Array of the zip file.
+                            The name variable is the file name of the file within the zip.
+                            The data variable can be ArrayBuffer, Uint8Array, or string.
+                            To make a zip file, a bunch of headers and data descriptors, including a CRC checksum and a bunch of info about the file, must be created, so that's what we're doing.
+                            https://en.wikipedia.org/wiki/ZIP_(file_format)#File_headers for more information on that.
+                            Writing all this shit would've been pretty tedious so yea. */
+							function createZip(name, data) {
+								// Convert input to Uint8Array
+								const enc = new TextEncoder();
+								const nameBytes = enc.encode(name);
+								const dataBytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data instanceof Uint8Array ? data : enc.encode(data);
+
+								// Calculate CRC and lengths
+								let crc = -1; // Initial value
+								const len = dataBytes.length;
+
+								// Process bytes in chunks
+								for (let i = 0; i < len; i++) {
+									crc = (crc >>> 8) ^ crcTable[(crc ^ dataBytes[i]) & 0xff];
+								}
+
+								// Finalize CRC and convert to unsigned int
+								crc = (crc ^ -1) >>> 0;
+
+								const dataLength = dataBytes.length;
+								const headerLength = 30 + nameBytes.length;
+
+								// Local File Header (starts at 0)
+								const localHeader = new DataView(new ArrayBuffer(headerLength));
+								localHeader.setUint32(0, 0x04034b50, true); // Signature
+								localHeader.setUint16(4, 0x0a00, true); // Version needed
+								localHeader.setUint32(14, crc, true); // CRC-32
+								localHeader.setUint32(18, dataLength, true); // Compressed size
+								localHeader.setUint32(22, dataLength, true); // Uncompressed size
+								localHeader.setUint16(26, nameBytes.length, true);
+								new Uint8Array(localHeader.buffer).set(nameBytes, 30);
+
+								// Central Directory (starts after file data)
+								// Note: Omitted fields default to 0, since the length is set manually.
+								const centralDir = new DataView(new ArrayBuffer(46 + nameBytes.length));
+								centralDir.setUint32(0, 0x02014b50, true); // Signature
+								centralDir.setUint16(6, 0x0a00, true); // Version needed
+								centralDir.setUint32(16, crc, true); // CRC-32
+								centralDir.setUint32(20, dataLength, true); // Sizes
+								centralDir.setUint32(24, dataLength, true);
+								centralDir.setUint16(28, nameBytes.length, true);
+								new Uint8Array(centralDir.buffer).set(nameBytes, 46);
+
+								// End of Central Directory
+								const end = new DataView(new ArrayBuffer(22));
+								end.setUint32(0, 0x06054b50, true); // Signature
+								end.setUint16(8, 1, true); // Entry count
+								end.setUint16(10, 1, true); // Total entries
+								end.setUint32(12, centralDir.buffer.byteLength, true); // Dir size
+								end.setUint32(16, headerLength + dataLength, true); // Dir offset
+
+								//Allocating a Uint8Array large enough for the file
+								const totalSize = localHeader.buffer.byteLength + dataBytes.length + centralDir.buffer.byteLength + end.buffer.byteLength;
+								const result = new Uint8Array(totalSize);
+
+								//Putting all the data together
+								let offset = 0;
+								[localHeader.buffer, dataBytes, centralDir.buffer, end.buffer].forEach((buf) => {
+									result.set(new Uint8Array(buf), offset);
+									offset += buf.byteLength || buf.length;
+								});
+
+								return result;
 							}
 
-							// Finalize CRC and convert to unsigned int
-							crc = (crc ^ -1) >>> 0;
+							zipFile = createZip(currentFile.file.name, fileArrayBuffer).buffer;
 
-							const dataLength = dataBytes.length;
-							const headerLength = 30 + nameBytes.length;
-
-							// Local File Header (starts at 0)
-							const localHeader = new DataView(new ArrayBuffer(headerLength));
-							localHeader.setUint32(0, 0x04034b50, true); // Signature
-							localHeader.setUint16(4, 0x0a00, true); // Version needed
-							localHeader.setUint32(14, crc, true); // CRC-32
-							localHeader.setUint32(18, dataLength, true); // Compressed size
-							localHeader.setUint32(22, dataLength, true); // Uncompressed size
-							localHeader.setUint16(26, nameBytes.length, true);
-							new Uint8Array(localHeader.buffer).set(nameBytes, 30);
-
-							// Central Directory (starts after file data)
-							// Note: Omitted fields default to 0, since the length is set manually.
-							const centralDir = new DataView(new ArrayBuffer(46 + nameBytes.length));
-							centralDir.setUint32(0, 0x02014b50, true); // Signature
-							centralDir.setUint16(6, 0x0a00, true); // Version needed
-							centralDir.setUint32(16, crc, true); // CRC-32
-							centralDir.setUint32(20, dataLength, true); // Sizes
-							centralDir.setUint32(24, dataLength, true);
-							centralDir.setUint16(28, nameBytes.length, true);
-							new Uint8Array(centralDir.buffer).set(nameBytes, 46);
-
-							// End of Central Directory
-							const end = new DataView(new ArrayBuffer(22));
-							end.setUint32(0, 0x06054b50, true); // Signature
-							end.setUint16(8, 1, true); // Entry count
-							end.setUint16(10, 1, true); // Total entries
-							end.setUint32(12, centralDir.buffer.byteLength, true); // Dir size
-							end.setUint32(16, headerLength + dataLength, true); // Dir offset
-
-							//Allocating a Uint8Array large enough for the file
-							const totalSize = localHeader.buffer.byteLength + dataBytes.length + centralDir.buffer.byteLength + end.buffer.byteLength;
-							const result = new Uint8Array(totalSize);
-
-							//Putting all the data together
-							let offset = 0;
-							[localHeader.buffer, dataBytes, centralDir.buffer, end.buffer].forEach((buf) => {
-								result.set(new Uint8Array(buf), offset);
-								offset += buf.byteLength || buf.length;
-							});
-
-							return result;
+							clipData.name += '.zip';
 						}
 
-						zipFile = createZip(currentFile.file.name, fileArrayBuffer).buffer;
+						try {
+							let newArrBuf = concatArrayBuffers(clipMaBuffer, zipFile);
 
-						clipData.name += '.zip';
+							let newFile = new File([new Uint8Array(newArrBuf)], clipData.name + '.mp4', { type: 'video/mp4' });
+							currentFile.file = newFile;
+							currentFile.clip = clipData;
+						} catch (err) {
+							errorHandler(err, currentFile);
+						}
 					}
-
-					try {
-						let newArrBuf = ArrayBuffer.concat(clipMaBuffer, zipFile);
-
-						let newFile = new File([new Uint8Array(newArrBuf)], clipData.name + '.mp4', { type: 'video/mp4' });
-						currentFile.file = newFile;
-						currentFile.clip = clipData;
-					} catch (err) {
-						errorHandler(err, currentFile, this.meta.name);
-					}
+					//#endregion
+					currentFile.platform = 1;
 				}
-				//#endregion
-				currentFile.platform = 1;
 			}
 			originalFunction(args);
 		});
 
-		Patcher.after(this.meta.name, ClipsEnabledMod, 'useEnableClips', (_, args, ret) => {
-			//I have no earthly idea why but, instead patching this one causes React crashes./
-			// Luckily after-patching prevents it from crashing and it still unlocks it as it should
+		Patcher.after(ClipsEnabledMod, 'useEnableClips', () => {
 			return true;
 		});
-		Patcher.instead(this.meta.name, ClipsEnabledMod, 'areClipsEnabled', () => {
+		Patcher.instead(ClipsEnabledMod, 'areClipsEnabled', () => {
 			return true;
 		});
-		Patcher.instead(this.meta.name, ClipsEnabledMod, 'isPremium', () => {
+		Patcher.instead(ClipsStore, 'isViewerClippingAllowedForUser', () => {
 			return true;
 		});
-		Patcher.instead(this.meta.name, ClipsAllowedMod, 'isClipsClientCapable', () => {
+		Patcher.instead(ClipsStore, 'isClipsEnabledForUser', () => {
 			return true;
 		});
-		Patcher.instead(this.meta.name, ClipsStore, 'isViewerClippingAllowedForUser', () => {
-			return true;
-		});
-		Patcher.instead(this.meta.name, ClipsStore, 'isClipsEnabledForUser', () => {
-			return true;
-		});
-		Patcher.instead(this.meta.name, ClipsStore, 'isVoiceRecordingAllowedForUser', () => {
+		Patcher.instead(ClipsStore, 'isVoiceRecordingAllowedForUser', () => {
 			return true;
 		});
 	} //End of clipsBypass()
@@ -1769,6 +3018,22 @@ module.exports = class BDNitro {
 		if (ffmpegScript) {
 			ffmpegScript.remove();
 		}
+		delete window.FFmpegWASM;
+
+		function tryFetchFromDisk(filename, encoding) {
+			const basepath = path.join(BdApi.Plugins.folder, 'ffmpeg');
+			let filepath = path.join(basepath, filename);
+			try {
+				if (fs.existsSync(filepath)) {
+					let file = fs.readFileSync(filepath, encoding);
+					Logger.info(`Fetch from disk for file ${filename} succeeded.`);
+					return file;
+				} else return false;
+			} catch (err) {
+				Logger.warn('Tried to read ' + filename + ' from disk but an error occurred.');
+				Logger.warn(err);
+			}
+		}
 
 		async function fetchAndRetryWithNetFetch(filename) {
 			const ffmpeg_js_baseurl = 'https://raw.githubusercontent.com/srgobi/BDNitro/refs/heads/main/ffmpeg/';
@@ -1776,28 +3041,50 @@ module.exports = class BDNitro {
 			if (res.ok || res.status == 200) {
 				return res;
 			} else {
-				Logger.warn('BDNitro', res);
+				Logger.warn(res);
 				res = await Net.fetch(ffmpeg_js_baseurl + filename, { timeout: 100000 });
 				if (res.ok || res.status == 200) {
 					return res;
 				} else {
-					Logger.error('BDNitro', res);
+					Logger.error(res);
 					throw new Error(filename + ' failed to fetch.');
 				}
 			}
 		}
 
+		async function fetchBlobUrl(filename) {
+			try {
+				let blobUrl;
+				let file = tryFetchFromDisk(filename, '');
+				if (file) blobUrl = URL.createObjectURL(new Blob([file]));
+				else blobUrl = URL.createObjectURL(await (await fetchAndRetryWithNetFetch(filename)).blob());
+				return blobUrl;
+			} catch (err) {
+				Logger.error('An error occurred while fetching ' + filename);
+				throw err;
+			}
+		}
+
+		let ffmpegWorkerURL, ffmpegCoreURL, ffmpegURL, ffmpegCoreWasmURL;
 		try {
 			//load 814.ffmpeg.js (ffmpeg worker)
-			let ffmpegWorkerURL = URL.createObjectURL(await (await fetchAndRetryWithNetFetch('814.ffmpeg.js')).blob());
+			ffmpegWorkerURL = await fetchBlobUrl('814.ffmpeg.js');
 
 			//load FFmpeg.js as text
-			let ffmpegSrc = await (await fetchAndRetryWithNetFetch('ffmpeg.js')).text();
+			let ffmpegSrc;
+			try {
+				let file = tryFetchFromDisk('ffmpeg.js');
+				if (file) ffmpegSrc = file;
+				else ffmpegSrc = await (await fetchAndRetryWithNetFetch('ffmpeg.js')).text();
+			} catch (err) {
+				Logger.error('An error occurred while fetching ffmpeg.js');
+				throw err;
+			}
 
 			//patch worker URL in the source of ffmpeg.js (why is this a problem lmao)
 			ffmpegSrc = ffmpegSrc.replace(`new URL(e.p+e.u(814),e.b)`, `"${ffmpegWorkerURL.toString()}"`);
 			//blob ffmpeg
-			const ffmpegURL = URL.createObjectURL(new Blob([ffmpegSrc]));
+			ffmpegURL = URL.createObjectURL(new Blob([ffmpegSrc]));
 
 			// for some reason, for ffmpeg.js to work we need to set global define to undefined temporarily.
 			// since for a brief moment it is undefined, any function that uses it may throw an error during that window.
@@ -1805,7 +3092,7 @@ module.exports = class BDNitro {
 
 			//load external JS as a script
 			await new Promise((load, err) => {
-				const ffmpegScriptElem = document.getElementById('ffmpegScript') || document.createElement('script');
+				const ffmpegScriptElem = document.createElement('script');
 				ffmpegScriptElem.id = 'ffmpegScript';
 				ffmpegScriptElem.src = ffmpegURL;
 				ffmpegScriptElem.onload = load;
@@ -1816,9 +3103,9 @@ module.exports = class BDNitro {
 			window.global.define = defineTemp;
 
 			//load ffmpeg core
-			let ffmpegCoreURL = URL.createObjectURL(await (await fetchAndRetryWithNetFetch('ffmpeg-core.js')).blob());
+			ffmpegCoreURL = await fetchBlobUrl('ffmpeg-core.js');
 
-			let ffmpegCoreWasmURL = URL.createObjectURL(await (await fetchAndRetryWithNetFetch('ffmpeg-core.wasm')).blob());
+			ffmpegCoreWasmURL = await fetchBlobUrl('ffmpeg-core.wasm');
 
 			if (FFmpegWASM && ffmpegCoreURL && ffmpegCoreWasmURL && ffmpegWorkerURL) {
 				ffmpeg = new FFmpegWASM.FFmpeg();
@@ -1827,24 +3114,29 @@ module.exports = class BDNitro {
 					coreURL: ffmpegCoreURL,
 					wasmURL: ffmpegCoreWasmURL
 				});
-				Logger.info(this.meta.name, 'FFmpeg load success!');
+				Logger.info('FFmpeg load success!');
 				ffmpeg.on('log', ({ message }) => {
 					console.log(message);
 				});
 			} else {
-				Logger.info(this.meta.name, FFmpegWASM);
-				Logger.info(this.meta.name, ffmpegCoreURL);
-				Logger.info(this.meta.name, ffmpegCoreWasmURL);
-				Logger.info(this.meta.name, ffmpegWorkerURL);
+				Logger.info('FFmpegWASM', FFmpegWASM);
+				Logger.info('ffmpegCoreURL', ffmpegCoreURL);
+				Logger.info('ffmpegCoreWasmURL', ffmpegCoreWasmURL);
+				Logger.info('ffmpegWorkerURL', ffmpegWorkerURL);
 				throw new Error('One or more of the necessary components failed to load.');
 			}
 		} catch (err) {
 			UI.showToast('An error occured trying to load FFmpeg.wasm. Check console for details.', { type: 'error', forceShow: true });
-			Logger.info(this.meta.name, 'FFmpeg failed to load. The clips bypass will not work without this unless the file is already the correct format! Include above and below error messages when reporting!');
-			Logger.error(this.meta.name, err);
+			Logger.info('FFmpeg failed to load. The clips bypass will not work without this unless the file is already the correct format! Include above and below error messages (if they exist) when reporting!');
+			Logger.error(err);
 		} finally {
 			//Ensure we return window.global.define to its regular state just in case we errored during the short window where it has to be set to undefined.
 			window.global.define = defineTemp;
+			//revoke blob urls since we dont actually need them anymore
+			if (ffmpegURL) URL.revokeObjectURL(ffmpegURL);
+			if (ffmpegCoreURL) URL.revokeObjectURL(ffmpegCoreURL);
+			if (ffmpegCoreWasmURL) URL.revokeObjectURL(ffmpegCoreWasmURL);
+			if (ffmpegWorkerURL) URL.revokeObjectURL(ffmpegWorkerURL);
 		}
 	} //End of loadFFmpeg()
 	// #endregion
@@ -1853,7 +3145,8 @@ module.exports = class BDNitro {
 	async experiments() {
 		try {
 			//code heavily modified from https://gist.github.com/JohannesMP/afdf27383608c3b6f20a6a072d0be93c?permalink_comment_id=4784940#gistcomment-4784940
-			CurrentUser.flags |= 1;
+			const currentUser = UserStore.getCurrentUser();
+			currentUser.flags |= 1;
 			const Stores = Object.values(UserStore._dispatcher._actionHandlers._dependencyGraph.nodes);
 			Stores.find((x) => x.name === 'DeveloperExperimentStore').actionHandler['CONNECTION_OPEN']();
 			try {
@@ -1861,7 +3154,7 @@ module.exports = class BDNitro {
 			} catch {}
 			Stores.find((x) => x.name === 'ExperimentStore').storeDidChange();
 		} catch (err) {
-			Logger.warn(this.meta.name, err);
+			Logger.warn(err);
 		}
 	}
 
@@ -1873,14 +3166,75 @@ module.exports = class BDNitro {
 			experimentBucket: bucket
 		});
 	}
+
+	overrideVariant(experimentName, variantId) {
+		Dispatcher.dispatch({
+			type: 'APEX_EXPERIMENT_OVERRIDE_CREATE',
+			experimentName,
+			variantId
+		});
+	}
 	// #endregion
+
+	applySavedClientTheme() {
+		//If last appearance choice was a preset nitro client theme
+		if (settings.lastGradientSettingStore != -1 && !settings.customUserThemeSettings.custom) {
+			//dispatch settings update event to change to the gradient the user chose
+			Dispatcher.dispatch({
+				type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
+				changes: {
+					appearance: {
+						shouldSync: false, //prevent sync to stop discord api from butting in
+						settings: {
+							theme: settings.customUserThemeSettings.theme, //dark or light theme
+							clientThemeSettings: {
+								backgroundGradientPresetId: settings.lastGradientSettingStore //preset ID for the gradient theme
+							},
+							developerMode: true
+						}
+					}
+				}
+			});
+
+			Dispatcher.dispatch({
+				type: 'UPDATE_BACKGROUND_GRADIENT_PRESET',
+				presetId: settings.lastGradientSettingStore
+			});
+		} else if (settings.customUserThemeSettings.custom) {
+			Dispatcher.dispatch({
+				type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
+				changes: {
+					appearance: {
+						shouldSync: false,
+						settings: {
+							clientThemeSettings: settings.customUserThemeSettings.custom,
+							theme: settings.customUserThemeSettings.theme,
+							developerMode: true
+						}
+					}
+				}
+			});
+
+			CustomUserThemeState.state.getState().setAll({
+				colors: settings.customUserThemeSettings.custom.colors,
+				chassisMixAmount: settings.customUserThemeSettings.custom.baseMix,
+				gradientAngle: settings.customUserThemeSettings.custom.gradientAngle
+			});
+		}
+	}
 
 	// #region Client Themes
 	clientThemes() {
+		try {
+			this.applySavedClientTheme();
+		} catch (err) {
+			Logger.error(err);
+		}
+
 		//delete isPreview property so that we can set our own
 		delete clientThemesModule.isPreview;
 
-		//this property basically unlocks the client theme buttons
+		//this property basically unlocks the preset client theme buttons
 		Object.defineProperty(clientThemesModule, 'isPreview', {
 			//Enabling the nitro theme settings
 			value: false,
@@ -1889,92 +3243,169 @@ module.exports = class BDNitro {
 			writable: true
 		});
 
-		//Patching saveClientTheme function.
-		Patcher.instead(this.meta.name, themesModule, 'saveClientTheme', (_, [args]) => {
-			//if user is trying to set the theme to a default theme
-			if (args.backgroundGradientPresetId == undefined) {
-				//If this number is -1, that indicates to the plugin that the current theme we're setting to is not a gradient nitro theme.
-				settings.lastGradientSettingStore = -1;
+		let saveClientTheme = this.findMangledName(themesModule, (x) => typeof x === 'function' && x.toString?.().includes?.('SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE'), 'saveClientTheme');
 
-				//save any changes to settings
-				Data.save(this.meta.name, 'settings', this.settings);
-
-				//dispatch settings update to change themes
-				Dispatcher.dispatch({
-					type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
-					changes: {
-						appearance: {
-							shouldSync: false, //prevent sync to stop discord api from butting in. Since this is not a nitro theme, shouldn't this be set to true? Idk, but I'm not touching it lol.
-							settings: {
-								theme: args.theme,
-								developerMode: true //genuinely have no idea what this does.
+		if (saveClientTheme) {
+			//Patching saveClientTheme function.
+			Patcher.instead(themesModule, saveClientTheme, (_, [args]) => {
+				//Support for custom gradient themes
+				if (args.customUserThemeSettings != undefined) {
+					//this dispatch is technically not necessary
+					Dispatcher.dispatch({
+						type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
+						changes: {
+							appearance: {
+								shouldSync: false,
+								settings: {
+									clientThemeSettings: args.customUserThemeSettings,
+									theme: args.theme,
+									developerMode: true
+								}
 							}
 						}
-					}
-				});
+					});
 
-				return;
-			} else {
-				//gradient themes
-				//Store the last gradient setting used in settings
-				settings.lastGradientSettingStore = args.backgroundGradientPresetId;
+					//save
+					settings.customUserThemeSettings.custom = args.customUserThemeSettings;
+					settings.customUserThemeSettings.theme = args.theme;
 
-				//save any changes to settings
-				Data.save(this.meta.name, 'settings', this.settings);
+					Data.save('settings', settings);
+				} else if (args.customUserThemeSettings == undefined && args?.backgroundGradientPresetId != undefined && args.theme != undefined) {
+					//preset gradient themes
+					//Store the last gradient setting used in settings
+					settings.lastGradientSettingStore = args.backgroundGradientPresetId;
 
-				//dispatch settings update event to change to the gradient the user chose
-				Dispatcher.dispatch({
-					type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
-					changes: {
-						appearance: {
-							shouldSync: false, //prevent sync to stop discord api from butting in
-							settings: {
-								theme: args.theme, //gradient themes are based off of either dark or light, args.theme stores this information
-								clientThemeSettings: {
-									backgroundGradientPresetId: args.backgroundGradientPresetId //preset ID for the gradient theme
-								},
-								developerMode: true
+					//indicate not custom
+					settings.customUserThemeSettings.custom = false;
+					//remove custom theme
+					CustomUserThemeState.state.setState(CustomUserThemeState.state.getInitialState());
+
+					//dark/light
+					settings.customUserThemeSettings.theme = args.theme;
+
+					//save any changes to settings
+					Data.save('settings', settings);
+
+					//dispatch settings update event to change to the gradient the user chose
+					Dispatcher.dispatch({
+						type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
+						changes: {
+							appearance: {
+								shouldSync: false, //prevent sync to stop discord api from butting in
+								settings: {
+									theme: args.theme, //gradient themes are based off of either dark or light, args.theme stores this information
+									clientThemeSettings: {
+										backgroundGradientPresetId: args.backgroundGradientPresetId //preset ID for the gradient theme
+									},
+									developerMode: true
+								}
 							}
 						}
-					}
-				});
+					});
 
-				//update background gradient preset to the one that was just chosen.
-				Dispatcher.dispatch({
-					type: 'UPDATE_BACKGROUND_GRADIENT_PRESET',
-					presetId: settings.lastGradientSettingStore
-				});
-			}
-		}); //End of saveClientTheme patch.
-
-		//If last appearance choice was a nitro client theme
-		if (settings.lastGradientSettingStore != -1) {
-			//This sets the gradient on plugin save and load.
-			Dispatcher.dispatch({
-				type: 'UPDATE_BACKGROUND_GRADIENT_PRESET',
-				presetId: settings.lastGradientSettingStore
-			});
-		}
-
-		//startSession patch. This function runs upon switching accounts.
-		Patcher.after(this.meta.name, accountSwitchModule, 'startSession', () => {
-			setTimeout(() => {
-				//If last appearance choice was a nitro client theme
-				if (settings.lastGradientSettingStore != -1) {
-					//Restore gradient on account switch
+					//update background gradient preset to the one that was just chosen.
 					Dispatcher.dispatch({
 						type: 'UPDATE_BACKGROUND_GRADIENT_PRESET',
 						presetId: settings.lastGradientSettingStore
 					});
+				} else if (args.customUserThemeSettings == undefined && args.backgroundGradientPresetId == undefined && !args.customUserThemeSettings) {
+					//if user is trying to set the theme to a default theme
+
+					//If this number is -1, that indicates to the plugin that the current theme we're setting to is not a gradient nitro theme.
+					settings.lastGradientSettingStore = -1;
+
+					//indicate not custom
+					settings.customUserThemeSettings.custom = false;
+
+					//remove custom theme
+					CustomUserThemeState.state.setState(CustomUserThemeState.state.getInitialState());
+
+					//save any changes to settings
+					Data.save('settings', settings);
+
+					//dispatch settings update to change themes
+					Dispatcher.dispatch({
+						type: 'SELECTIVELY_SYNCED_USER_SETTINGS_UPDATE',
+						changes: {
+							appearance: {
+								shouldSync: false, //prevent sync to stop discord api from butting in. Since this is not a nitro theme, shouldn't this be set to true? Idk, but I'm not touching it lol.
+								settings: {
+									theme: args.theme,
+									developerMode: true //genuinely have no idea what this does.
+								}
+							}
+						}
+					});
+				}
+			}); //End of saveClientTheme patch.
+		}
+
+		//startSession patch. This function runs upon switching accounts.
+		Patcher.after(accountSwitchModule, 'startSession', () => {
+			setTimeout(() => {
+				try {
+					this.applySavedClientTheme();
+				} catch (err) {
+					Logger.error(err);
 				}
 			}, 3000);
+		});
+
+		Patcher.after(CustomThemesEditor, 'render', (_, [args], ret) => {
+			//dont replace footer if user is premium
+			if (CurrentUser.premiumType == 2) return;
+
+			//take the onSaveTheme function from the original footer cause we still need it
+			const onSaveTheme = ret?.props?.children?.[1]?.props?.onSaveTheme;
+
+			if (onSaveTheme) {
+				//replace the original footer with a custom one
+				ret.props.children[1] = React.createElement('div', {
+					style: {
+						display: 'flex',
+						gap: '25px',
+						padding: '16px 30px',
+						borderTop: '1px solid var(--border-subtle)'
+					},
+					children: [
+						React.createElement(Components.Button, {
+							children: 'Back',
+							className: 'bd-secondary-button',
+							style: {
+								width: '100%'
+							},
+							onClick: () => {
+								UserSettingsModal.openUserSettings('appearance_panel');
+
+								//close theme customization panel
+								CustomUserPanelState.state.setState({
+									activePanel: null,
+									metadata: null
+								});
+							}
+						}),
+						React.createElement(Components.Button, {
+							children: 'Apply',
+							style: {
+								width: '100%',
+								fontSize: '16px'
+							},
+							onClick: (e) => {
+								onSaveTheme(e);
+							}
+						})
+					]
+				});
+			} else {
+				Logger.error('onSaveTheme is not defined.', ret);
+			}
 		});
 	} //End of clientThemes()
 	// #endregion
 
 	// #region Custom PFP Decode
 	customProfilePictureDecoding() {
-		Patcher.instead(this.meta.name, getAvatarUrlModule, 'getAvatarURL', (user, [userId, size, shouldAnimate], originalFunction) => {
+		Patcher.instead(getAvatarUrlModule.prototype, 'getAvatarURL', (user, [userId, size, shouldAnimate], originalFunction) => {
 			//userpfp closer integration
 			//if we haven't fetched userPFP database yet and it's enabled
 			if ((!fetchedUserPfp || this.userPfps == undefined) && settings.userPfpIntegration) {
@@ -2026,144 +3457,6 @@ module.exports = class BDNitro {
 			return `https://i.imgur.com/${matchedText}`;
 		});
 	}
-	// #endregion
-
-	// #region Custom PFP Encode
-	//Custom PFP profile customization buttons and encoding code.
-	async customProfilePictureEncoding(secondsightifyEncodeOnly) {
-		//wait for avatar customization section renderer to be loaded
-		await Webpack.waitForModule(Webpack.Filters.byStrings('showRemoveAvatarButton', 'onAvatarChange', 'isTryItOutFlow'));
-		//store avatar customization section renderer module
-		if (this.customPFPSettingsRenderMod == undefined)
-			this.customPFPSettingsRenderMod = Webpack.getMangled(/showRemoveAvatarButton:.{1,3},errors:.{1,3},onAvatarChange/, {
-				AvatarSection: (x) => x
-			});
-
-		function emptyWarn() {
-			UI.showToast('No URL was provided. Please enter an Imgur URL.', { type: 'warning' });
-		}
-
-		Patcher.after(this.meta.name, this.customPFPSettingsRenderMod, 'AvatarSection', (_, [args], ret) => {
-			//don't need to do anything if this is the "Try out Nitro" flow.
-			if (args.isTryItOutFlow) return;
-
-			ret.props.children.props.children.push(
-				React.createElement('input', {
-					id: 'profilePictureUrlInput',
-					style: {
-						width: '30%',
-						height: '20%',
-						maxHeight: '50%',
-						marginTop: '5px',
-						marginLeft: '5px'
-					},
-					placeholder: 'Imgur URL for PFP'
-				})
-			);
-
-			//Create and append Copy PFP 3y3 button.
-			ret.props.children.props.children.push(
-				React.createElement('button', {
-					children: 'Copy PFP 3y3',
-					className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
-					id: 'profilePictureButton',
-					style: {
-						marginLeft: '10px',
-						whiteSpace: 'nowrap'
-					},
-					onClick: async function () {
-						//on copy pfp 3y3 button click
-
-						//grab text from pfp url input textarea.
-						let profilePictureUrlInputValue = String(document.getElementById('profilePictureUrlInput').value);
-
-						//empty, skip.
-						if (profilePictureUrlInputValue == undefined || profilePictureUrlInputValue == '') {
-							emptyWarn();
-							return;
-						}
-
-						//clean up string to encode
-						let stringToEncode =
-							'' +
-							profilePictureUrlInputValue
-								//clean up URL
-								.replace('http://', '') //remove protocol
-								.replace('https://', '')
-								.replace('i.imgur.com', 'imgur.com');
-
-						let encodedStr = ''; //initialize encoded string as empty string
-						stringToEncode = String(stringToEncode); //make doubly sure stringToEncode is a string
-
-						//if url seems correct
-						if (stringToEncode.toLowerCase().startsWith('imgur.com')) {
-							//Check for album or gallery URL
-							if (stringToEncode.replace('imgur.com/', '').startsWith('a/') || stringToEncode.replace('imgur.com/', '').startsWith('gallery/')) {
-								//Album URL, what follows is all to get the direct image link, since the album URL is not a direct link to the file.
-
-								//Fetch imgur album page
-								try {
-									const parser = new DOMParser();
-									stringToEncode = await Net.fetch('https://' + stringToEncode, {
-										method: 'GET',
-										mode: 'cors'
-									}).then((res) =>
-										res
-											.text()
-											//parse html, queryselect meta tag with certain name
-											.then((res) => parser.parseFromString(res, 'text/html').querySelector('[name="twitter:player"]').content)
-									);
-									stringToEncode = stringToEncode
-										.replace('http://', '') //get rid of protocol
-										.replace('https://', '') //get rid of protocol
-										.replace('i.imgur.com', 'imgur.com')
-										.replace('.jpg', '')
-										.replace('.jpeg', '')
-										.replace('.webp', '')
-										.replace('.png', '')
-										.replace('.mp4', '')
-										.replace('.webm', '')
-										.replace('.gifv', '')
-										.replace('.gif', '') //get rid of any file extension
-										.split('?')[0]; //remove any URL parameters since we don't want or need them
-								} catch (err) {
-									Logger.error('BDNitro', err);
-									UI.showToast('An error occurred. Are there multiple images in this album/gallery?', { type: 'error', forceShow: true });
-									return;
-								}
-							}
-							if (stringToEncode == '') {
-								UI.showToast("An error occurred: couldn't find file name.", { type: 'error', forceShow: true });
-								Logger.error('BDNitro', "Couldn't find file name for some reason when grabbing Imgur URL for Custom PFP. Contact srgobi!");
-							}
-
-							//add starting "P{" , remove "imgur.com/" , and add ending "}"
-							stringToEncode = 'P{' + stringToEncode.replace('imgur.com/', '') + '}';
-							//finally encode the string, adding a space before it so nothing fucks up
-							encodedStr = ' ' + secondsightifyEncodeOnly(stringToEncode);
-
-							//If this is not an Imgur URL, yell at the user.
-						} else if (stringToEncode.toLowerCase().startsWith('imgur.com') == false) {
-							UI.showToast('Please use Imgur!', { type: 'warning' });
-							return;
-						}
-
-						//if somehow none of the previous code ran, this is the last protection against an error. If this runs, something has probably gone horribly wrong.
-						if (encodedStr == '') return;
-
-						//copy to clipboard
-						try {
-							DiscordNative.clipboard.copy(encodedStr);
-							UI.showToast('3y3 copied to clipboard!', { type: 'info' });
-						} catch (err) {
-							UI.showToast('Failed to copy to clipboard!', { type: 'error', forceShow: true });
-							Logger.error('BDNitro', err);
-						}
-					} //end copy pfp 3y3 click event
-				}) //end of react createElement
-			); //end of element push
-		}); //end of patch
-	} //End of customProfilePictureEncoding()
 	// #endregion
 
 	// #region Loading Badges
@@ -2416,252 +3709,104 @@ module.exports = class BDNitro {
 	}
 	// #endregion
 
-	// #region 3y3 Secondsightify
-	secondsightifyRevealOnly(t) {
-		if ([...t].some((x) => 0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f)) {
-			// 3y3 text detected. Revealing...
-			return ((t) => [...t].map((x) => (0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f ? String.fromCodePoint(x.codePointAt(0) - 0xe0000) : x)).join(''))(t);
-		} else {
-			// no encoded text found, returning
-			return;
-		}
-	}
-
-	secondsightifyEncodeOnly(t) {
-		if ([...t].some((x) => 0xe0000 < x.codePointAt(0) && x.codePointAt(0) < 0xe007f)) {
-			// 3y3 text detected. returning...
-			return;
-		} else {
-			// no 3y3 text detected. encoding...
-			return ((t) => [...t].map((x) => (0x00 < x.codePointAt(0) && x.codePointAt(0) < 0x7f ? String.fromCodePoint(x.codePointAt(0) + 0xe0000) : x)).join(''))(t);
-		}
-	}
-	// #endregion
-
 	// #region Profile Effects
-	//Everything related to Fake Profile Effects.
 	async profileFX(secondsightifyEncodeOnly) {
 		if (settings.killProfileEffects) return; //profileFX is mutually exclusive with killProfileEffects (obviously)
 
-		//wait for profile effects module
-		await Webpack.waitForModule(Webpack.Filters.byKeys('profileEffects', 'tryItOutId'));
+		//trigger collectibles fetch
+		await FetchCollectibleCategories({
+			includeBundles: true,
+			includeUnpublished: false,
+			noCache: false,
+			paymentGateway: undefined
+		});
 
-		if (this.profileEffects == undefined) this.profileEffects = Webpack.getStore('ProfileEffectStore').profileEffects;
-
-		//if profile effects data hasn't been fetched by the client yet
-		if (this.profileEffects == undefined || this.profileEffects?.length === 0) {
-			//make the client fetch profile effects
-			await fetchProfileEffects();
-			this.profileEffects = Webpack.getStore('ProfileEffectStore').profileEffects;
-		}
-
-		let profileEffectIdList = new Array();
-		for (let i = 0; i < this.profileEffects.length; i++) {
-			profileEffectIdList.push(this.profileEffects[i].id);
-		}
-
-		Patcher.after(this.meta.name, UserProfileStore, 'getUserProfile', (_, [args], ret) => {
+		Patcher.after(UserProfileStore, 'getUserProfile', (_, [userId], ret) => {
 			//error prevention
 			if (ret == undefined) return;
 			if (ret.bio == undefined) return;
 
-			//if bio includes encoded /fx
-			if (ret.bio.includes(`\uDB40\uDC2F\uDB40\uDC66\uDB40\uDC78`)) {
-				//reveal 3y3 encoded text. this string will also include the rest of the bio
-				let revealedText = this.secondsightifyRevealOnly(ret.bio);
+			let perServer = this.getRevealedTextPerServer(userId, `\uDB40\uDC66\uDB40\uDC78`);
+
+			//if main or server bio includes encoded fx
+			if (perServer || ret.bio.includes(`\uDB40\uDC66\uDB40\uDC78`)) {
+				let revealedText;
+				if (!perServer)
+					revealedText = this.secondsightifyRevealOnly(ret.bio); //reveal 3y3 encoded text. this string will also include the rest of the bio
+				else revealedText = perServer;
+
 				if (revealedText == undefined) return;
 
 				//if profile effect 3y3 is detected
-				if (revealedText.includes('/fx')) {
-					const regex = /\/fx\d+/;
+				if (revealedText.includes('fx')) {
+					const regex = /fx\d+/;
 					let matches = revealedText.toString().match(regex);
 					if (matches == undefined) return;
 					let firstMatch = matches[0];
 					if (firstMatch == undefined) return;
 
-					//slice the /fx and only take the number after it.
-					let effectIndex = parseInt(firstMatch.slice(3));
-					//ignore invalid data
-					if (isNaN(effectIndex)) return;
-					//ignore if the profile effect id does not point to an actual profile effect
-					if (profileEffectIdList[effectIndex] == undefined) return;
-					//set the profile effect. stringify it.
-					ret.profileEffectId = profileEffectIdList[effectIndex] + '';
+					//slice the fx and only take the number after it.
+					let effectId = firstMatch.slice(2);
+
+					//apply profile effect
+					ret.profileEffect = {
+						skuId: effectId,
+						expiresAt: null
+					};
 
 					//if for some reason we dont know what this user's ID is, stop here
-					if (args == undefined) return;
+					if (userId == undefined) return;
 					//otherwise add them to the list of users who show up with the BDNitro user badge
-					if (!badgeUserIDs.includes(args)) badgeUserIDs.push(args);
+					if (!badgeUserIDs.includes(userId)) badgeUserIDs.push(userId);
 				}
 			}
 		}); //end of getUserProfile patch.
-
-		//wait for profile effect section renderer to be loaded.
-		await Webpack.waitForModule(Webpack.Filters.byStrings('initialSelectedEffectId', 'isTryItOutFlow'));
-
-		//fetch the module now that it's loaded
-		if (this.profileEffectSectionRenderer == undefined)
-			this.profileEffectSectionRenderer = Webpack.getMangled(/isTryItOutFlow:.{1,3}=!1,initialSelectedEffectId/, {
-				ProfileEffectSection: (x) => x
-			});
-
-		//patch profile effect section renderer function to run the following code after the function runs
-		Patcher.after(this.meta.name, this.profileEffectSectionRenderer, 'ProfileEffectSection', (_, [args], ret) => {
-			const profileEffects = this.profileEffects;
-
-			function ProfileEffects({ query }) {
-				//if this is the tryItOut flow, don't do anything.
-				if (args.isTryItOutFlow) return;
-
-				let profileEffectChildren = [];
-				let actualRuns = 0;
-
-				//for each profile effect
-				for (let i = 0; i < profileEffects.length; i++) {
-					//get preview image url
-					let previewURL = profileEffects[i].config.thumbnailPreviewSrc;
-					let title = profileEffects[i].config.title;
-
-					//search
-					if (query.trim() != '') {
-						if (title) {
-							if (!title.toLowerCase().includes(query)) continue;
-						} else continue;
-					}
-
-					//encode 3y3
-					let encodedStr = secondsightifyEncodeOnly('/fx' + i); //fx0, fx1, etc.
-					//javascript that runs onclick for each profile effect button
-					let copyDecoration3y3 = function () {
-						try {
-							DiscordNative.clipboard.copy(' ' + encodedStr);
-							UI.showToast('3y3 copied to clipboard!', { type: 'info' });
-						} catch (err) {
-							UI.showToast('Failed to copy to clipboard!', { type: 'error', forceShow: true });
-							Logger.error('BDNitro', err);
-						}
-					};
-
-					profileEffectChildren.push(
-						React.createElement('img', {
-							className: 'srgobisSecretStuff',
-							onClick: copyDecoration3y3,
-							src: previewURL,
-							title,
-							style: {
-								width: '22.5%',
-								cursor: 'pointer',
-								marginBottom: '0.5em',
-								marginLeft: '0.5em',
-								backgroundColor: 'var(--background-tertiary)'
-							}
-						})
-					);
-
-					//add newline every 4th profile effect
-					if ((actualRuns + 1) % 4 == 0) {
-						profileEffectChildren.push(React.createElement('br'));
-					}
-
-					actualRuns++;
-				}
-				return React.createElement('div', {
-					children: profileEffectChildren,
-					style: {
-						paddingTop: '10px'
-					}
-				});
-			}
-
-			//Profile Effects Modal
-			function EffectsModal() {
-				const [query, setQuery] = React.useState('');
-
-				return React.createElement('div', {
-					style: {
-						width: '100%',
-						display: 'block',
-						color: 'white',
-						whiteSpace: 'nowrap',
-						overflow: 'visible',
-						marginTop: '.5em'
-					},
-					children: [
-						React.createElement(Components.TextInput, {
-							value: query,
-							placeholder: 'Search...',
-							onChange: (input) => setQuery(input)
-						}),
-						React.createElement('br'),
-						React.createElement(ProfileEffects, { query })
-					]
-				});
-			}
-
-			//Append Change Effect button
-			ret.props.children.props.children.push(
-				//self explanatory create react element
-				React.createElement('button', {
-					children: 'Change Effect [BDNitro]',
-					className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
-					size: 'bd-button-small',
-					id: 'changeProfileEffectButton',
-					style: {
-						width: '100px',
-						height: '32px',
-						color: 'white',
-						marginLeft: '10px'
-					},
-					onClick: () => {
-						UI.showConfirmationModal('Change Profile Effect (BDNitro)', React.createElement(EffectsModal), { cancelText: '' });
-					}
-				})
-			);
-		}); //end patch of profile effect section renderer function
 	} //End of profileFX()
 
 	killProfileFX() {
 		//self explanatory, just tries to make it so any profile that has a profile effect appears without it
-		Patcher.after(this.meta.name, UserProfileStore, 'getUserProfile', (_, args, ret) => {
-			if (ret?.profileEffectID === undefined) return;
-			ret.profileEffectID = undefined;
+		Patcher.after(UserProfileStore, 'getUserProfile', (_, args, ret) => {
+			if (ret?.profileEffect === undefined) return;
+			ret.profileEffect = undefined;
 		});
 	}
 	// #endregion
 
 	//fetch collectibles - decorations and nameplates are stored in data
 	storeProductsFromCategories = (event) => {
-		if (event.categories) {
-			event.categories.forEach((category) => {
+		if (event?.categories?.categories) {
+			event.categories.categories.forEach((category) => {
 				category.products.forEach((product) => {
 					product.items.forEach((item) => {
-						if (item.asset) {
-							//store nameplates
-							if (item.asset.startsWith('nameplates')) {
+						switch (item.type) {
+							case 0:
+								//store avatar decorations assets
+								data.avatarDecorations[item.skuId] = item.asset;
+								break;
+							case 1:
+								//profile effects
+								profileEffects[item.skuId] = item;
+								break;
+							case 2:
+								//store nameplates
 								data.nameplatesV2[item.skuId] = {
 									asset: item.asset.replace('nameplates/', ''),
 									palette: item.palette,
 									name: product.name
 								};
-								return;
-							} else if (item.asset.startsWith('a_')) {
-								//store avatar decorations assets
-								data.avatarDecorations[item.id] = item.asset;
-								return;
-							}
+								break;
 						}
 					});
 				});
 			});
+			this.saveDataFile();
 		}
 	};
 
 	// #region Avatar Decorations
-	//Everything related to fake avatar decorations.
-
 	async fakeAvatarDecorations() {
 		//apply decorations
-		Patcher.after(this.meta.name, UserStore, 'getUser', (_, args, ret) => {
+		Patcher.after(UserStore, 'getUser', (_, args, ret) => {
 			//basic error checking
 			if (args == undefined) return;
 			if (args[0] == undefined) return;
@@ -2707,133 +3852,25 @@ module.exports = class BDNitro {
 				//set avatar decoration data to fake avatar decoration
 				ret.avatarDecorationData = {
 					asset: avatarDecorations[assetId],
-					sku_id: '0' //dummy sku id
+					skuId: assetId
 				};
 
 				//add user to the list of users to show with the BDNitro user badge if we haven't already.
 				if (!badgeUserIDs.includes(ret.id)) badgeUserIDs.push(ret.id);
 			}
 		}); //end of getUser patch for avatar decorations
-
-		//Wait for avatar decor customization section render module to be loaded.
-		await Webpack.waitForModule(Webpack.Filters.byStrings('userAvatarDecoration', 'guildAvatarDecoration', 'pendingAvatarDecoration'));
-
-		//Avatar decoration customization section render module/function.
-		if (!this.decorationCustomizationSectionMod)
-			this.decorationCustomizationSectionMod = Webpack.getMangled(/guildAvatarDecoration:.{1,3}?,pendingAvatarDecoration/, {
-				AvatarDecorationSection: (x) => x
-			});
-		//Avatar decoration customization section patch
-		Patcher.after(this.meta.name, this.decorationCustomizationSectionMod, 'AvatarDecorationSection', (_, [args], ret) => {
-			//don't run if this is the try out nitro flow.
-			if (args.isTryItOutFlow) return;
-
-			//push change decoration button
-			ret.props.children[0].props.children.push(
-				React.createElement('button', {
-					id: 'decorationButton',
-					children: 'Change Decoration [BDNitro]',
-					style: {
-						width: '100px',
-						height: '50px',
-						color: 'white',
-						borderRadius: '3px',
-						marginLeft: '5px'
-					},
-					className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
-					onClick: () => {
-						UI.showConfirmationModal('Change Avatar Decoration (BDNitro)', React.createElement(DecorModal), { cancelText: '' });
-					}
-				})
-			);
-
-			const secondsightifyEncodeOnly = this.secondsightifyEncodeOnly;
-
-			function AvatarDecorations() {
-				if (!data.avatarDecorations) throw new Error(`Cannot possibly continue! Avatar decoration data is undefined! Did the data JSON fail to load?`);
-				let listOfDecorationIds = Object.keys(data.avatarDecorations);
-				let avatarDecorationChildren = [];
-
-				//for each avatar decoration
-				for (let i = 0; i < listOfDecorationIds.length; i++) {
-					const decorationId = listOfDecorationIds[i];
-					const assetHash = data.avatarDecorations[decorationId];
-
-					//remove existing nameplates from decoration list
-					if (assetHash.startsWith('nameplates/nameplates/')) {
-						delete data.avatarDecorations[decorationId];
-						continue;
-					}
-
-					//encode to 3y3 and store clipboard copy in onclick event
-					let encodedStr = secondsightifyEncodeOnly('/a' + decorationId); // /a[id]
-					//javascript that runs onclick for each avatar decoration button
-
-					let child = React.createElement('img', {
-						style: {
-							width: '23%',
-							cursor: 'pointer',
-							marginLeft: '5px',
-							marginBottom: '10px',
-							borderRadius: '4px',
-							backgroundColor: 'var(--background-tertiary)'
-						},
-						onClick: () => {
-							try {
-								DiscordNative.clipboard.copy(' ' + encodedStr);
-								UI.showToast('3y3 copied to clipboard!', { type: 'info' });
-							} catch (err) {
-								UI.showToast('Failed to copy to clipboard!', { type: 'error', forceShow: true });
-								Logger.error('BDNitro', err);
-							}
-						},
-						onMouseOver: (e) => {
-							e.target.src = e.target.src.replace('.webp', '.png');
-						},
-						onMouseLeave: (e) => {
-							e.target.src = e.target.src.replace('.png', '.webp');
-						},
-						src: 'https://cdn.discordapp.com/avatar-decoration-presets/' + assetHash + '.webp?size=128'
-					});
-					avatarDecorationChildren.push(child);
-
-					//add newline every 4th decoration
-					if ((i + 1) % 4 == 0) {
-						//avatarDecorationsHTML += "<br>"
-						avatarDecorationChildren.push(React.createElement('br'));
-					}
-				}
-				return React.createElement('div', {
-					children: avatarDecorationChildren
-				});
-			}
-
-			function DecorModal() {
-				return React.createElement('div', {
-					style: {
-						width: '100%',
-						display: 'block',
-						color: 'white',
-						whiteSpace: 'nowrap',
-						overflow: 'visible',
-						marginTop: '.5em'
-					},
-					children: React.createElement(AvatarDecorations)
-				});
-			}
-		}); //end patch of profile decoration section renderer function
 	} //End of fakeAvatarDecorations()
 	// #endregion
 
 	//#region Emote Uploader
 	async UploadEmote(url, channelIdLmao, msg, emoji, runs, send) {
 		if (!msg[2].attachmentsToUpload) msg[2].attachmentsToUpload = [];
-		if (emoji === undefined) {
-			let emoji = { animated: true, name: 'default' };
+		if (emoji == undefined) {
+			emoji = { animated: true, name: 'default' };
 		}
 
-		if (msg === undefined) {
-			let msg = [channelIdLmao, { content: '' }, []];
+		if (msg == undefined) {
+			msg = [channelIdLmao, { content: '' }, []];
 		}
 
 		let extension = '.gif';
@@ -2845,7 +3882,7 @@ module.exports = class BDNitro {
 		}
 
 		//Download emote by URL, convert to blob, then convert to File object
-		let file = await fetch(url)
+		let file = await Net.fetch(url)
 			.then((r) => r.blob())
 			.then((blobFile) => new File([blobFile], emoji.name + extension));
 		file.platform = 1; // Not exactly sure what this does, but it should be set to 1.
@@ -2872,7 +3909,7 @@ module.exports = class BDNitro {
 			//send and wait till its sent before moving on
 			await send.apply(undefined, msg);
 		} catch (err) {
-			Logger.error(this.meta.name, err);
+			Logger.error(err);
 		}
 	}
 	// #endregion
@@ -2895,7 +3932,7 @@ module.exports = class BDNitro {
 				try {
 					send(channelId, msg, { attachmentsToUpload: files }); //finally finish the process of uploading
 				} catch (err) {
-					Logger.error(this.meta.name, err);
+					Logger.error(err);
 				}
 			} else {
 				//Upload 10 files at a time with a delay
@@ -2907,7 +3944,7 @@ module.exports = class BDNitro {
 					try {
 						send(channelId, msg, { attachmentsToUpload: tenFiles });
 					} catch (err) {
-						Logger.error(this.meta.name, err);
+						Logger.error(err);
 					}
 					firstTime = false;
 					await new Promise((r) => setTimeout(r, 3000));
@@ -2917,16 +3954,14 @@ module.exports = class BDNitro {
 	}
 	// #endregion
 
-	//#region Customize Go Live V1
+	//#region Stream Options Context Menu
 	customizeStreamButtons() {
-		//Apply custom resolution and fps options for Go Live Modal V1
-
-		//This also effects Go Live Modal V2 but only after a refresh, not much I can do about that
+		//Apply custom resolution and fps options for Stream Options context menu
 
 		//If you're trying to figure this shit out yourself, I recommend uncommenting the line below.
 		//console.log(StreamButtons);
 
-		const settings = Data.load('BDNitro', 'settings'); //just in case we can't access this;
+		const settings = Data.load('settings');
 
 		//If custom resolution tick is disabled or custom resolution is set to 0, set it to 1440
 		let resolutionToSet = parseInt(settings.CustomResolution);
@@ -2935,47 +3970,36 @@ module.exports = class BDNitro {
 		//Some of these properties are marked as read only, but they still allow you to delete them
 		//So any time you see "delete", what we're doing is bypassing the read-only lock by deleting it and remaking it.
 
-		//Set resolution buttons and requirements
-
-		delete ApplicationStreamResolutions.RESOLUTION_1440;
-		//Change 1440p resolution internally to custom resolution
-		ApplicationStreamResolutions.RESOLUTION_1440 = resolutionToSet;
-
 		//************************************Buttons below this point*****************************************
-		//Set resolution button value to custom resolution
-		ApplicationStreamResolutionButtons[2].value = resolutionToSet;
-		delete ApplicationStreamResolutionButtons[2].label;
-		//Set label of resolution button to custom resolution. This one is used in the popup window that appears before you start streaming.
-		ApplicationStreamResolutionButtons[2].label = resolutionToSet.toString();
 
 		//Set value of button with suffix label to custom resolution
-		ApplicationStreamResolutionButtonsWithSuffixLabel[3].value = resolutionToSet;
-		delete ApplicationStreamResolutionButtonsWithSuffixLabel[3].label;
-		//Set label of button with suffix label to custom resolution with "p" after it, ex: "1440p"
-		//This one is used in the dropdown kind of menu after you've started streaming
-		ApplicationStreamResolutionButtonsWithSuffixLabel[3].label = resolutionToSet + 'p';
+		if (settings.CustomResolution) {
+			delete ApplicationStreamResolutions.RESOLUTION_1440;
+			//Change 1440p resolution internally to custom resolution
+			ApplicationStreamResolutions.RESOLUTION_1440 = resolutionToSet;
+			ApplicationStreamResolutionButtonsWithSuffixLabel[3].value = resolutionToSet;
+			delete ApplicationStreamResolutionButtonsWithSuffixLabel[3].label;
+			//Set label of button with suffix label to custom resolution with "p" after it, ex: "1440p"
+			//This one is used in the dropdown kind of menu after you've started streaming
+			ApplicationStreamResolutionButtonsWithSuffixLabel[3].label = resolutionToSet + 'p';
+		}
 
 		let fpsToSet = parseInt(settings.CustomFPS);
 		//If custom FPS toggle is disabled, set to the default 60.
 		if (!settings.CustomFPSEnabled) fpsToSet = 60;
 
-		//set suffix label button value to the custom number
-		ApplicationStreamFPSButtonsWithSuffixLabel[2].value = fpsToSet;
-		delete ApplicationStreamFPSButtonsWithSuffixLabel[2].label;
-		//set button suffix label with the correct number with " FPS" after it. ex: "75 FPS". This one is used in the dropdown kind of menu
-		ApplicationStreamFPSButtonsWithSuffixLabel[2].label = fpsToSet + ' FPS';
-		//set fps button value to the correct number.
-		ApplicationStreamFPSButtons[2].value = fpsToSet;
-		delete ApplicationStreamFPSButtons[2].label;
-		//set fps button label to the correct number. This one is used in the popup window that appears before you start streaming.
-		ApplicationStreamFPSButtons[2].label = fpsToSet.toString();
-		ApplicationStreamFPS.FPS_60 = fpsToSet;
+		if (settings.CustomFPSEnabled) {
+			//set suffix label button value to the custom number
+			ApplicationStreamFPSButtonsWithSuffixLabel[2].value = fpsToSet;
+			delete ApplicationStreamFPSButtonsWithSuffixLabel[2].label;
+			//set button suffix label with the correct number with " FPS" after it. ex: "75 FPS". This one is used in the dropdown kind of menu
+			ApplicationStreamFPSButtonsWithSuffixLabel[2].label = fpsToSet + ' FPS';
+			ApplicationStreamFPS.FPS_60 = fpsToSet;
+		}
 
-		Data.save('BDNitro', 'settings', settings);
+		Data.save('settings', settings);
 	} //End of customizeStreamButtons()
 	//#endregion
-
-	// #region Emoji Bypass-related
 
 	//Whether we should skip the emoji bypass for a given emoji.
 	// true = skip bypass
@@ -2997,11 +4021,13 @@ module.exports = class BDNitro {
 	}
 
 	_sendMessageInsteadPatch() {
-		this.experiments();
-		this.overrideExperiment('2024-11_soundmoji_sending', 2);
+		if (settings.soundmojiEnabled) {
+			this.overrideVariant('2026-03-soundmoji-rendering', 1);
+			this.overrideVariant('2026-03-soundmoji-sending', 2);
+		}
 
 		//#region _sendMessage Patch
-		Patcher.instead(this.meta.name, MessageActions, '_sendMessage', async (_, msg, send) => {
+		Patcher.instead(MessageActions, '_sendMessage', async (_, msg, send) => {
 			if (msg[2].poll != undefined || msg[2].activityAction != undefined || msg[2].messageReference) {
 				//fix polls, activity actions, forwarding
 				send.apply(_, msg);
@@ -3024,7 +4050,7 @@ module.exports = class BDNitro {
 				}
 
 				if (!SDCEnabled) {
-					msg[1].validNonShortcutEmojis.forEach(async (emoji) => {
+					msg[1].validNonShortcutEmojis?.forEach?.(async (emoji) => {
 						if (this.emojiBypassForValidEmoji(emoji, currentChannelId)) return; //Unlocked emoji. Skip.
 						if (emoji.type == 'UNICODE') return; //If this "emoji" is actually a unicode character, it doesn't count. Skip bypassing if so.
 						if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
@@ -3036,10 +4062,14 @@ module.exports = class BDNitro {
 							emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
 						}
 
-						//If there is a backslash (\) before the emote we are processing,
-						if (msg[1].content.includes('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>')) {
-							//remove the backslash
-							msg[1].content = msg[1].content.replace('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>', '<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>');
+						let allNamesString = emoji.originalName ? emoji.originalName : emoji.name;
+
+						let emojiString = `<${emoji.animated ? 'a:' : ':'}${allNamesString}:${emoji.id}>`;
+
+						//If there is a heiphen (-) before the emote we are processing,
+						if (msg[1].content.includes('-' + emojiString)) {
+							//remove the heiphen
+							msg[1].content = msg[1].content.replace('-' + emojiString, emojiString);
 							//and skip bypass for that emote
 							return;
 						}
@@ -3047,7 +4077,7 @@ module.exports = class BDNitro {
 						//remove existing URL parameters and add custom URL parameters for user's size preference. quality is always lossless.
 						emojiUrl = emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&`;
 						//remove emote from message.
-						msg[1].content = msg[1].content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, '');
+						msg[1].content = msg[1].content.replace(emojiString, '');
 
 						//queue for upload
 						emojis.push(emoji);
@@ -3057,7 +4087,6 @@ module.exports = class BDNitro {
 			}
 			//#endregion
 
-			//#region Upload Soundmojis
 			const channelId = msg[0];
 			let regex = /<sound:[0-9]\d+:[0-9]\d+>/g;
 			let ids = [];
@@ -3086,19 +4115,18 @@ module.exports = class BDNitro {
 					}
 				}
 			}
-			if (settings.emojiBypass && settings.emojiBypassType == 0) {
-				if (emojis.length > 0) {
-					//upload all emotes
-					for (let i = 0; i < emojis.length; i++) {
-						await this.UploadEmote(emojiUrls[i], currentChannelId, msg, emojis[i], i, send);
-					}
-					//reset message content since we dont want a repeated message if soundmoji upload happens next
-					msg[1].content = '';
+
+			if (settings.emojiBypass && settings.emojiBypassType == 0 && emojis.length > 0) {
+				//upload all emotes
+				for (let i = 0; i < emojis.length; i++) {
+					await this.UploadEmote(emojiUrls[i], currentChannelId, msg, emojis[i], i, send);
 				}
+				//reset message content since we dont want a repeated message if soundmoji upload happens next
+				msg[1].content = '';
 			}
 
-			if (settings.soundmojiEnabled) {
-				if (sounds.length > 0) await this.UploadSoundmojis(ids, channelId, msg[1], sounds, send);
+			if (settings.soundmojiEnabled && sounds.length > 0) {
+				await this.UploadSoundmojis(ids, channelId, msg[1], sounds, send);
 			}
 
 			if (settings.stickerBypass) {
@@ -3134,79 +4162,21 @@ module.exports = class BDNitro {
 	}
 
 	emojiBypass() {
-		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'isEmojiFilteredOrLocked', () => {
+		Patcher.instead(isEmojiAvailableMod, 'isEmojiFilteredOrLocked', () => {
 			return false;
 		});
-		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'isEmojiDisabled', () => {
+		Patcher.instead(isEmojiAvailableMod, 'isEmojiDisabled', () => {
 			return false;
 		});
-		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'isEmojiFiltered', () => {
+		Patcher.instead(isEmojiAvailableMod, 'isEmojiFiltered', () => {
 			return false;
 		});
-		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'isEmojiPremiumLocked', () => {
+		Patcher.instead(isEmojiAvailableMod, 'isEmojiPremiumLocked', () => {
 			return false;
 		});
-		Patcher.instead(this.meta.name, isEmojiAvailableMod, 'getEmojiUnavailableReason', () => {
+		Patcher.instead(isEmojiAvailableMod, 'getEmojiUnavailableReason', () => {
 			return;
 		});
-
-		//#region Ghost Mode Patch
-		//Ghost mode method
-		const ghostmodetext =
-			'||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​|| _ _ _ _ _ ';
-
-		if (settings.emojiBypassType == 1) {
-			function ghostModeMethod(msg, currentChannelId, self) {
-				if (document.getElementsByClassName('sdc-tooltip').length > 0) {
-					let SDC_Tooltip = document.getElementsByClassName('sdc-tooltip')[0];
-					if (SDC_Tooltip.innerHTML == 'Disable Encryption') {
-						//SDC Encryption Enabled
-						return;
-					}
-				}
-				let emojiGhostIteration = 0; // dummy value we add to the end of the URL parameters to make the same emoji appear more than once despite having the same URL.
-				msg.validNonShortcutEmojis.forEach((emoji) => {
-					if (self.emojiBypassForValidEmoji(emoji, currentChannelId)) return;
-					if (emoji.type == 'UNICODE') return;
-					if (settings.PNGemote) emoji.forcePNG = true;
-
-					let emojiUrl = AvatarDefaults.getEmojiURL(emoji);
-					if (emoji.guildId === undefined || emoji.id === undefined || emoji.useSpriteSheet) return; //Skip system emoji.
-					if (emoji.animated) {
-						emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
-					}
-
-					if (msg.content.includes('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>')) {
-						msg.content = msg.content.replace('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>', '<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>');
-						return; //If there is a backslash before the emoji, skip it.
-					}
-
-					//if ghost mode is not required
-					if (msg.content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, '') == '') {
-						msg.content = msg.content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless& `);
-						return;
-					}
-					emojiGhostIteration++; //increment dummy value
-
-					//if message already has ghostmodetext.
-					if (msg.content.includes(ghostmodetext)) {
-						//remove processed emoji from the message
-						(msg.content = msg.content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, '')),
-							//add to the end of the message
-							(msg.content += ' ' + emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&${emojiGhostIteration}& `);
-						return;
-					}
-					//if message doesn't already have ghostmodetext, remove processed emoji and add it to the end of the message with the ghost mode text
-					(msg.content = msg.content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, '')), (msg.content += ghostmodetext + '\n' + emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless& `);
-				});
-			}
-
-			//sending message in ghost mode
-			Patcher.before(this.meta.name, MessageActions, 'sendMessage', (_, [currentChannelId, msg]) => {
-				ghostModeMethod(msg, currentChannelId, this);
-			});
-		}
-		//#endregion
 
 		//#region Classic Mode Patch
 		//Original method
@@ -3220,7 +4190,7 @@ module.exports = class BDNitro {
 					}
 				}
 				//refer to previous bypasses for comments on what this all is for.
-				let emojiGhostIteration = 0;
+				let emojiInteration = 0;
 				msg.validNonShortcutEmojis.forEach((emoji) => {
 					if (self.emojiBypassForValidEmoji(emoji, currentChannelId)) return;
 					if (emoji.type == 'UNICODE') return;
@@ -3232,35 +4202,28 @@ module.exports = class BDNitro {
 						emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
 					}
 
-					if (msg.content.includes('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>')) {
-						msg.content = msg.content.replace('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>', '<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>');
-						return; //If there is a backslash before the emoji, skip it.
+					let allNamesString = emoji.originalName ? emoji.originalName : emoji.name;
+
+					let emojiString = `<${emoji.animated ? 'a:' : ':'}${allNamesString}:${emoji.id}>`;
+					if (msg.content.includes('-' + emojiString)) {
+						msg.content = msg.content.replace('-' + emojiString, emojiString);
+						return; //If there is a heiphen before the emoji, skip it.
 					}
-					emojiGhostIteration++;
-					msg.content = msg.content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&${emojiGhostIteration}& `);
+					emojiInteration++;
+					msg.content = msg.content.replace(emojiString, emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&${emojiInteration} `);
 				});
 			}
 
 			//sending message in classic mode
-			Patcher.before(this.meta.name, MessageActions, 'sendMessage', (_, [currentChannelId, msg]) => {
+			Patcher.before(MessageActions, 'sendMessage', (_, [currentChannelId, msg]) => {
 				classicModeMethod(msg, currentChannelId, this);
-			});
-
-			//editing message in classic mode
-			Patcher.before(this.meta.name, MessageActions, 'editMessage', (_, obj) => {
-				let msg = obj[2].content;
-				if (msg.search(/\d{18}/g) == -1) return;
-				if (msg.includes(':ENC:')) return; //Fix jank with editing SimpleDiscordCrypt encrypted messages.
-				msg.match(/<a:.+?:\d{18}>|<:.+?:\d{18}>/g).forEach((idfkAnymore) => {
-					obj[2].content = obj[2].content.replace(idfkAnymore, `https://cdn.discordapp.com/emojis/${idfkAnymore.match(/\d{18}/g)[0]}?size=${settings.emojiSize}&quality=lossless&`);
-				});
 			});
 		}
 		//#endregion
 
 		//#region Vencord-like Patch
-		//Vencord-like bypass
-		if (settings.emojiBypassType == 3) {
+		//Vencord-like bypass                    (ghost mode removed, fallback to hyperlink)
+		else if (settings.emojiBypassType == 3 || settings.emojiBypassType == 1) {
 			function vencordModeMethod(msg, currentChannelId, self) {
 				if (document.getElementsByClassName('sdc-tooltip').length > 0) {
 					let SDC_Tooltip = document.getElementsByClassName('sdc-tooltip')[0];
@@ -3270,7 +4233,7 @@ module.exports = class BDNitro {
 					}
 				}
 				//refer to previous bypasses for comments on what this all is for.
-				let emojiGhostIteration = 0;
+				let emojiInteration = 0;
 				msg.validNonShortcutEmojis.forEach((emoji) => {
 					if (self.emojiBypassForValidEmoji(emoji, currentChannelId)) return;
 					if (emoji.type == 'UNICODE') return;
@@ -3282,38 +4245,145 @@ module.exports = class BDNitro {
 						emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
 					}
 
-					if (msg.content.includes('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>')) {
-						msg.content = msg.content.replace('\\<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>', '<' + emoji.allNamesString.replace(/~\b\d+\b/g, '') + emoji.id + '>');
-						return; //If there is a backslash before the emoji, skip it.
+					let allNamesString = emoji.originalName ? emoji.originalName : emoji.name;
+
+					let emojiString = `<${emoji.animated ? 'a:' : ':'}${allNamesString}:${emoji.id}>`;
+
+					if (msg.content.includes('-' + emojiString)) {
+						msg.content = msg.content.replace('-' + emojiString, emojiString);
+						return; //If there is a heiphen before the emoji, skip it.
 					}
-					emojiGhostIteration++;
-					msg.content = msg.content.replace(`<${emoji.animated ? 'a' : ''}${emoji.allNamesString.replace(/~\b\d+\b/g, '')}${emoji.id}>`, `[${emoji.name}](` + emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&${emojiGhostIteration}&)`);
+					emojiInteration++;
+					msg.content = msg.content.replace(emojiString, `[${allNamesString}](` + emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&${emojiInteration})`);
 				});
 			}
 
 			//sending message in vencord-like mode
-			Patcher.before(this.meta.name, MessageActions, 'sendMessage', (_, [currentChannelId, msg]) => {
+			Patcher.before(MessageActions, 'sendMessage', (_, [currentChannelId, msg]) => {
 				vencordModeMethod(msg, currentChannelId, this);
 			});
 		}
 		//#endregion
+
+		if (settings.editMessageWithEmoji) {
+			//applying edited message
+			Patcher.before(MessageActions, 'editMessage', (_, [channelId, msgId, msg]) => {
+				if (msg.content.includes(':ENC:')) return; //Fix jank with editing SimpleDiscordCrypt encrypted messages.
+				//...except SimpleDiscordCrypt has been broken for years, so really this does nothing and is only included as a tradition.
+
+				let emojiInteration = 0;
+
+				msg.content.match(/<a?:.+?:\d+>/g)?.forEach?.((emojiString) => {
+					if (msg.content.includes('-' + emojiString)) {
+						msg.content = msg.content.replace('-' + emojiString, emojiString);
+						return; //If there is a heiphen before the emoji, skip it.
+					}
+
+					let [animatedStr, name, id] = emojiString.replace('<', '').replace('>', '').split(':');
+					let animatedBool = animatedStr === 'a';
+
+					let forcePNG = !animatedBool && settings.PNGemote;
+					let emojiUrl = AvatarDefaults.getEmojiURL({ id, animated: animatedBool, size: settings.emojiSize, forcePNG });
+					if (animatedBool) {
+						emojiUrl = emojiUrl.substr(0, emojiUrl.lastIndexOf('.')) + '.gif';
+					}
+
+					emojiInteration++;
+					switch (settings.emojiBypassType) {
+						default:
+						case 0: //upload
+						case 1: //ghost (removed)
+						case 3: //vencord
+							msg.content = msg.content.replace(emojiString, `[${name}](` + emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&${emojiInteration})`);
+							break;
+						case 2: //classic
+							msg.content = msg.content.replace(emojiString, emojiUrl.split('?')[0] + `?size=${settings.emojiSize}&quality=lossless&${emojiInteration} `);
+							break;
+					}
+				});
+			});
+
+			//starting editing message
+			Patcher.before(MessageActions, 'startEditMessageRecord', (_, [channelId, msg]) => {
+				lastEditedMsg = msg;
+				lastEditedMsgCopy = { ...msg };
+
+				let idFromUrlRegex = /(?<=emojis\/)(\d+?)(?=\.(png|webp|gif|avif|jpg|jpeg))/gi;
+
+				//vencord mode undo
+				let vencordRegex = /\[.+?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/.+?\)/gi;
+				if (msg.content.includes('[') && msg.content.includes('/emojis/')) {
+					msg.content.match(vencordRegex)?.forEach?.((matched) => {
+						let startOfName = matched.indexOf('[') + 1;
+						let endOfName = matched.indexOf(']') - 1;
+						let emojiName = matched.substring(startOfName, endOfName);
+
+						let startOfUrl = matched.indexOf('(') + 1;
+						let endOfUrl = matched.indexOf(')') - 1;
+						let emojiUrl = matched.substring(startOfUrl, endOfUrl);
+
+						let emojiId = emojiUrl.match(idFromUrlRegex)?.[0];
+
+						let animated = emojiUrl.includes('.gif') || emojiUrl.includes('.avif');
+						if (emojiId != undefined && emojiUrl != undefined && emojiName != undefined) {
+							msg.content = msg.content.replace(matched, `<${animated ? 'a:' : ':'}${emojiName}:${emojiId}>`);
+						}
+					});
+				}
+
+				const ghostmodetext =
+					'||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​|| _ _ _ _ _ ';
+
+				//cleanup ghost mode text
+				if (msg.content.includes(ghostmodetext)) msg.content = msg.content.replace(ghostmodetext, '');
+
+				//classic / ghost mode undo
+				let emojiUrlRegex = /https:\/\/cdn\.discordapp\.com\/emojis\/\d+\.(png|webp|gif|avif|jpg|jpeg).*?(?=$| )/gi;
+				if (msg.content.includes('/emojis/')) {
+					msg.content.match(emojiUrlRegex)?.forEach?.((emojiUrl) => {
+						let emojiId = emojiUrl.match(idFromUrlRegex)?.[0];
+						let animated = emojiUrl.includes('.gif') || emojiUrl.includes('.avif');
+
+						if (emojiId) msg.content = msg.content.replace(emojiUrl, `<${animated ? 'a:' : ':'}emoji:${emojiId}>`);
+					});
+				}
+			});
+		}
+
+		Patcher.before(MessageActions, 'endEditMessage', () => {
+			if (lastEditedMsg?.content != undefined && lastEditedMsgCopy?.content != undefined)
+				//fix cancelling edit by restoring message to original state manually after cancellation
+				lastEditedMsg.content = lastEditedMsgCopy.content;
+		});
+
+		//#endregion
 	} //End of emojiBypass()
 
 	//#region Fake Inline Emoji
-	inlineFakemojiPatch() {
+	async inlineFakemojiPatch() {
 		//Somehow, this is the first time I've had to actually patch message rendering. (and it shows!)
-		Patcher.before(this.meta.name, messageRender.renderMessage, 'type', (_, [args]) => {
+
+		if (!this.messageRenderMod) this.messageRenderMod = await Webpack.waitForModule(Webpack.Filters.bySource('.SEND_FAILED,'), { defaultExport: false, signal: controller.signal });
+		if (!this.messageRenderMod) {
+			Logger.warn('messageRenderMod is undefined.');
+			return;
+		}
+		const messageRender = Object.values(this.messageRenderMod).find((o) => typeof o === 'object');
+
+		Patcher.before(messageRender, 'type', (_, [args]) => {
 			for (let i = 0; i < args.content.length; i++) {
 				let contentItem = args.content[i];
 
-				if (contentItem.type.type?.toString().includes('MASKED_LINK')) {
+				if (contentItem?.type?.type?.toString?.().includes?.('MASKED_LINK')) {
 					//is it a hyperlink?
 
 					if (contentItem.props.href.startsWith('https://cdn.discordapp.com/emojis/')) {
 						//does this hyperlink have an emoji URL?
 
+						if (contentItem.props.href == contentItem.props.title) continue; //skip direct emoji URL (causes too much buggy behavior)
+
 						let emojiName = contentItem.props?.children[0]?.props?.children;
-						if (emojiName == undefined) continue;
+						if (emojiName == undefined) emojiName = 'unknownEmoji'; //fallback to default emoji name if unknown
 
 						let key = contentItem.key; //store key
 
@@ -3343,15 +4413,15 @@ module.exports = class BDNitro {
 
 		//who knows what unholy compatibility issues this will bring me
 		//this code fucking sucks i think
-		Patcher.instead(this.meta.name, renderEmbedsMod, 'renderEmbeds', (_, [message], originalFunction) => {
-			//get what the original function would have returned
-			let ret = originalFunction(message);
-			if (ret) {
-				if (ret.length > 0) {
-					for (let i = 0; i < ret.length; i++) {
-						if (ret[i]) {
-							if (ret[i].props?.children?.props?.embed?.image?.url) {
-								let url = ret[i].props.children.props.embed.image.url;
+		Patcher.before(renderEmbedsMod, 'renderEmbeds', (_, [args]) => {
+			const embeds = args?.message?.embeds;
+
+			if (embeds) {
+				if (embeds.length > 0) {
+					for (let i = 0; i < embeds.length; i++) {
+						if (embeds[i]) {
+							if (embeds[i].url) {
+								let url = embeds[i].url;
 								let isEmojiHyperlink = false;
 
 								//this embed is an emoji
@@ -3360,23 +4430,23 @@ module.exports = class BDNitro {
 									 * so if someone has an emoji URL and a hyperlink with that same URL in the same message, it won't render correctly (or at least not how you might expect)!
 									 * Let's just hope nobody notices that..! I didn't have this system initially cause I'm a dumbfuck and didn't think it over.
 									 */
-									if (message.content.includes(`](${url})`)) {
+									if (args.message.content.includes(`](${url})`)) {
 										isEmojiHyperlink = true;
 									}
 
 									//if currently processed embed is an emoji and a hyperlink
 									if (isEmojiHyperlink) {
-										if (ret.length == 1) {
+										if (embeds.length == 1) {
 											//if there is only 1 fakemoji
 
 											//removes first instance of pattern [anyemojiname](https://cdn.discordapp.com/emojis/anynumber.ext) then checks if there is anything else in the message
 											if (
-												message.content
-													.replace(/\[.*?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/\d+\.(png|webp|gif).*?\)/, '') //is regex necessary? probably.
+												args.message.content
+													.replace(/\[.*?\]\(https:\/\/cdn\.discordapp\.com\/emojis\/\d+\.(png|webp|gif|avif|jpg|jpeg).*?\)/, '') //is regex necessary? probably.
 													.trim().length > 0
 											) {
 												//if there is other stuff in the message, delete the embed
-												delete ret[i];
+												delete embeds[i];
 											}
 											//if there is 1 fakemoji and nothing else in the message, it will keep the regular embed (default behavior)
 											//for some reason, if the fakemoji is in a message alone, it disappears, so keeping the embed was the easiest solution
@@ -3384,7 +4454,7 @@ module.exports = class BDNitro {
 
 										//if there is more than 1 hyperlink
 										else {
-											delete ret[i]; //if the hyperlink is an emoji url, delete the embed
+											delete embeds[i]; //if the hyperlink is an emoji url, delete the embed
 										}
 									}
 								}
@@ -3393,9 +4463,7 @@ module.exports = class BDNitro {
 					}
 				}
 				//removes empty items from the array. def did not take from stackoverflow (trust)
-				ret = ret.filter((n) => n);
-
-				return ret;
+				args.message.embeds = args.message.embeds.filter((n) => n);
 			} else {
 				//if the original function returns undefined/null
 				//this should never happen, but in case it does, return an empty array
@@ -3409,7 +4477,7 @@ module.exports = class BDNitro {
 	//#region Video Quality Patch
 	videoQualityModule() {
 		//Custom Bitrates, FPS, Resolution
-		Patcher.before(this.meta.name, videoOptionFunctions, 'updateVideoQuality', (e) => {
+		Patcher.before(videoOptionFunctions.prototype, 'updateVideoQuality', (e) => {
 			if (settings.CustomBitrateEnabled) {
 				if (settings.minBitrate > 0) {
 					//Minimum Bitrate
@@ -3485,7 +4553,7 @@ module.exports = class BDNitro {
 	//#endregion
 
 	async stickerSending() {
-		Patcher.instead(this.meta.name, MessageActions, 'sendStickers', (_, args, originalFunction) => {
+		Patcher.instead(MessageActions, 'sendStickers', (_, args, originalFunction) => {
 			let stickerID = args[1][0];
 			let stickerURL = 'https://media.discordapp.net/stickers/' + stickerID + '.png?size=4096&quality=lossless';
 			let currentChannelId = SelectedChannelStore.getChannelId();
@@ -3507,78 +4575,40 @@ module.exports = class BDNitro {
 
 	//#region 3y3 Profile Colors
 	decodeAndApplyProfileColors() {
-		Patcher.after(this.meta.name, UserProfileStore, 'getUserProfile', (_, args, ret) => {
+		Patcher.after(UserProfileStore, 'getUserProfile', (_, [userId], ret) => {
 			if (ret == undefined) return;
 			if (ret.bio == null) return;
-			const colorString = ret.bio.match(/\u{e005b}\u{e0023}([\u{e0061}-\u{e0066}\u{e0041}-\u{e0046}\u{e0030}-\u{e0039}]+?)\u{e002c}\u{e0023}([\u{e0061}-\u{e0066}\u{e0041}-\u{e0046}\u{e0030}-\u{e0039}]+?)\u{e005d}/u);
-			if (colorString == null) return;
-			let parsed = [...colorString[0]].map((c) => String.fromCodePoint(c.codePointAt(0) - 0xe0000)).join('');
-			let colors = parsed
-				.substring(1, parsed.length - 1)
-				.split(',')
-				.map((x) => parseInt(x.replace('#', '0x'), 16));
-			ret.themeColors = colors;
-			ret.premiumType = 2;
+
+			function decodeProfileColors(string) {
+				const colorString = string.match(/\u{e005b}\u{e0023}([\u{e0061}-\u{e0066}\u{e0041}-\u{e0046}\u{e0030}-\u{e0039}]+?)\u{e002c}\u{e0023}([\u{e0061}-\u{e0066}\u{e0041}-\u{e0046}\u{e0030}-\u{e0039}]+?)\u{e005d}/u);
+				if (colorString == null) return false;
+				let parsed = [...colorString[0]].map((c) => String.fromCodePoint(c.codePointAt(0) - 0xe0000)).join('');
+				let colors = parsed
+					.substring(1, parsed.length - 1)
+					.split(',')
+					.map((x) => parseInt(x.replace('#', '0x'), 16));
+				ret.themeColors = colors;
+				ret.premiumType = 2;
+				return true;
+			}
+
+			//per-server pronoun field check
+			const guildId = SelectedGuildStore.getGuildId();
+			if (guildId) {
+				let userGuildProfile = UserProfileStore.getGuildMemberProfile(userId, guildId);
+				if (userGuildProfile?.pronouns) {
+					let success = decodeProfileColors(userGuildProfile.pronouns);
+					if (success) return;
+				}
+				if (userGuildProfile?.bio) {
+					let success = decodeProfileColors(userGuildProfile.bio);
+					if (success) return;
+				}
+			}
+
+			decodeProfileColors(ret.bio);
 		});
 	}
-
-	//Everything that has to do with the GUI and encoding of the fake profile colors 3y3 shit.
-	//Replaced DOM manipulation with React patching 4/2/2024
-	async encodeProfileColors() {
-		//wait for theme color picker module to be loaded
-		await Webpack.waitForModule(Webpack.Filters.byKeys('getTryItOutThemeColors'));
-
-		//wait for color picker renderer module to be loaded
-		await Webpack.waitForModule(Webpack.Filters.byStrings('__invalid_profileThemesSection'));
-
-		if (this.colorPickerRendererMod == undefined)
-			this.colorPickerRendererMod = Webpack.getMangled('__invalid_profileThemesSection', {
-				ProfileThemesSection: (x) => x
-			});
-
-		Patcher.after(this.meta.name, this.colorPickerRendererMod, 'ProfileThemesSection', (_, args, ret) => {
-			ret.props.children.props.children.push(
-				//append copy colors 3y3 button
-				React.createElement('button', {
-					id: 'copy3y3button',
-					children: 'Copy Colors 3y3',
-					className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
-					style: {
-						marginLeft: '10px',
-						marginTop: '10px'
-					},
-					onClick: () => {
-						let themeColors;
-						themeColors = UserSettingsAccountStore.getAllPending().pendingThemeColors;
-						if (!themeColors) themeColors = UserSettingsAccountStore.getAllTryItOut().tryItOutThemeColors;
-						if (!themeColors) {
-							UI.showToast('Nothing has been copied. Is the selected color identical to your current color?', { type: 'warning' });
-							return;
-						}
-						const primary = themeColors[0];
-						const accent = themeColors[1];
-						let message = `[#${primary.toString(16).padStart(6, '0')},#${accent.toString(16).padStart(6, '0')}]`;
-						const padding = '';
-						let encoded = Array.from(message)
-							.map((x) => x.codePointAt(0))
-							.filter((x) => x >= 0x20 && x <= 0x7f)
-							.map((x) => String.fromCodePoint(x + 0xe0000))
-							.join('');
-
-						let encodedStr = (padding || '') + ' ' + encoded;
-
-						try {
-							DiscordNative.clipboard.copy(encodedStr);
-							UI.showToast('3y3 copied to clipboard!', { type: 'info' });
-						} catch (err) {
-							UI.showToast('Failed to copy to clipboard!', { type: 'error', forceShow: true });
-							Logger.error('BDNitro', err);
-						}
-					}
-				})
-			);
-		});
-	} //End of encodeProfileColors()
 	//#endregion
 
 	//#region Banner Decoding
@@ -3605,16 +4635,28 @@ module.exports = class BDNitro {
 		}
 
 		//Patch getUserBannerURL function
-		Patcher.before(this.meta.name, AvatarDefaults, 'getUserBannerURL', (_, args) => {
+		Patcher.before(AvatarDefaults, 'getUserBannerURL', (_, args) => {
 			args[0].canAnimate = true;
 		});
 
-		//Patch getBannerURL function
-		Patcher.instead(this.meta.name, getBannerURL, 'getBannerURL', (user, [args], ogFunction) => {
-			let profile = user._userProfile;
+		//set user to render with premium rendering
+		Patcher.after(UserProfileStore, 'getUserProfile', (_, [userId], ret) => {
+			if (ret != undefined) {
+				if (ret.bio?.includes?.(`\uDB40\uDC42\uDB40\uDC7B`)) {
+					ret.premiumType = 2;
+					return;
+				}
+				let perServer = this.getRevealedTextPerServer(userId, `\uDB40\uDC42\uDB40\uDC7B`);
+				if (perServer) {
+					ret.premiumType = 2;
+				}
+			}
+		});
 
-			//Returning ogFunction with the same arguments that were passed to this function will do the vanilla check for a legit banner.
-			if (profile == undefined) return ogFunction(args);
+		function getBannerUrl(user, self) {
+			let profile = user?._userProfile;
+
+			if (profile == undefined) return;
 
 			if (settings.userBgIntegration) {
 				//if userBg integration is enabled
@@ -3622,224 +4664,82 @@ module.exports = class BDNitro {
 				if (fetchedUserBg) {
 					//if user is in userBg database,
 					if (usrBgData?.users[user.userId]) {
-						profile.banner = 'funky_kong_is_epic'; //set banner id to fake value
-						profile.premiumType = 2; //set this profile to appear with premium rendering
 						return `${endpoint}/${bucket}/${prefix}${user.userId}?${usrBgData?.users[user.userId]}`; //return userBg banner URL and exit.
 					}
 				}
 			}
 
-			//do original function if we don't have the user's bio
-			if (profile.bio == undefined) return ogFunction(args);
-			//              includes /B encoded?
-			if (profile.bio.includes(`\uDB40\uDC42\uDB40\uDC7B`)) {
-				//reveal 3y3 encoded text, store as parsed
-				let parsed = this.secondsightifyRevealOnly(profile.bio);
-				//if there is no 3y3 encoded text, return original function
-				if (parsed == undefined) return ogFunction(args);
+			//reveal 3y3 encoded text, store as parsed
+			let parsed = self.getRevealedText(user.userId, `\uDB40\uDC42\uDB40\uDC7B`);
+			//if there is no 3y3 encoded text, return original function
+			if (parsed == undefined) return;
 
-				//This regex matches B{*} . Do not touch unless you know what you are doing.
-				let regex = /B\{[^}]*?\}/;
+			//This regex matches B{*} . Do not touch unless you know what you are doing.
+			let regex = /B\{[^}]*?\}/;
 
-				//find banner url in parsed bio
-				let matches = parsed.toString().match(regex);
+			//find banner url in parsed
+			let matches = parsed.toString().match(regex);
 
-				//if there's no matches, return original function
-				if (matches == undefined) return ogFunction(args);
-				if (matches == '') return ogFunction(args);
+			//if there's no matches, return original function
+			if (matches == undefined) return;
 
-				//if there is matched text, grab the first match, replace the starting "B{" and ending "}" to get the clean filename
-				let matchedText = matches[0].replace('B{', '').replace('}', '');
+			//if there is matched text, grab the first match, replace the starting "B{" and ending "}" to get the clean filename
+			let matchedText = matches[0].replace('B{', '').replace('}', '');
 
-				//Checking for file extension.
-				if (!String(matchedText).endsWith('.gif') && !String(matchedText).endsWith('.png') && !String(matchedText).endsWith('.jpg') && !String(matchedText).endsWith('.jpeg') && !String(matchedText).endsWith('.webp')) {
-					matchedText += '.gif'; //Fallback to a default file extension if one is not found.
-				}
-
-				//set banner id to fake value
-				profile.banner = 'funky_kong_is_epic';
-
-				//set this profile to appear with premium rendering
-				profile.premiumType = 2;
-
-				//add this user to the list of users that show with the BDNitro user badge if we haven't aleady.
-				if (!badgeUserIDs.includes(user.userId)) badgeUserIDs.push(user.userId);
-
-				//return final banner URL.
-				return `https://i.imgur.com/${matchedText}`;
+			//Checking for file extension.
+			if (!String(matchedText).endsWith('.gif') && !String(matchedText).endsWith('.png') && !String(matchedText).endsWith('.jpg') && !String(matchedText).endsWith('.jpeg') && !String(matchedText).endsWith('.webp')) {
+				matchedText += '.gif'; //Fallback to a default file extension if one is not found.
 			}
-		}); //End of patch for getBannerURL
+
+			//add this user to the list of users that show with the BDNitro user badge if we haven't aleady.
+			if (!badgeUserIDs.includes(user.userId)) badgeUserIDs.push(user.userId);
+
+			//return final banner URL.
+			return `https://i.imgur.com/${matchedText}`;
+		}
+
+		Patcher.after(ProfileBanner, 'renderBanner', (_, args, ret) => {
+			nodePatcher.patch(ret, (props, res) => {
+				let bannerUrl = getBannerUrl(props.displayProfile, this);
+				if (bannerUrl) {
+					if (res?.props?.children?.[1]?.props?.children?.[1]?.props?.style) {
+						res.props.children[1].props.children[1].props.style.backgroundImage = `url(${bannerUrl})`;
+					}
+				}
+			});
+		});
 	} //End of bannerUrlDecoding()
 	//#endregion
 
-	//#region Banner Encoding
-	//Make buttons in profile customization settings, encode imgur URLs and copy to clipboard
-	//Documented/commented and partially rewritten to use React patching on 3/6/2024
-	async bannerUrlEncoding(secondsightifyEncodeOnly) {
-		//wait for banner customization renderer module to be loaded
-		await Webpack.waitForModule(Webpack.Filters.byStrings('showRemoveBannerButton', 'isTryItOutFlow', 'buttonsContainer'));
-		if (this.profileBannerSectionRenderer == undefined)
-			this.profileBannerSectionRenderer = Webpack.getMangled(/showRemoveBannerButton:.{1,3}?,errors:.{1,3}?,onBannerChange/, {
-				BannerSection: (x) => x
-			});
-
-		function emptyWarn() {
-			UI.showToast('No URL was provided. Please enter an Imgur URL.', { type: 'warning' });
-		}
-
-		Patcher.after(this.meta.name, this.profileBannerSectionRenderer, 'BannerSection', (_, args, ret) => {
-			//create and append profileBannerUrlInput input element.
-			let profileBannerUrlInput = React.createElement('input', {
-				id: 'profileBannerUrlInput',
-				placeholder: 'Imgur URL for Banner',
-				style: {
-					float: 'right',
-					width: '30%',
-					height: '20%',
-					maxHeight: '50%',
-					marginTop: 'auto',
-					marginBottom: 'auto',
-					marginLeft: '10px'
-				}
-			});
-			ret.props.children.props.children.push(profileBannerUrlInput);
-
-			ret.props.children.props.children.push(
-				//append Copy 3y3 button
-				//create react element
-
-				React.createElement('button', {
-					id: 'profileBannerButton',
-					children: 'Copy Banner 3y3',
-					className: `${buttonClassModule.button} ${buttonClassModule.lookFilled} ${buttonClassModule.colorBrand} ${buttonClassModule.sizeSmall} ${buttonClassModule.grow}`,
-					size: 'bd-button-small',
-					style: {
-						whiteSpace: 'nowrap',
-						marginLeft: '10px'
-					},
-					onClick: async function () {
-						//Upon clicking Copy 3y3 button
-
-						//grab text from banner URL input textarea
-						let profileBannerUrlInputValue = String(document.getElementById('profileBannerUrlInput').value);
-
-						//if it's empty, stop processing and issue a warning.
-						if (profileBannerUrlInputValue == undefined) {
-							emptyWarn();
-							return;
-						}
-						if (profileBannerUrlInputValue == '') {
-							emptyWarn();
-							return;
-						}
-
-						//clean up string to encode
-						let stringToEncode =
-							'' +
-							profileBannerUrlInputValue
-								.replace('http://', '') //get rid of protocol
-								.replace('https://', '')
-								.replace('.jpg', '')
-								.replace('.png', '')
-								.replace('.mp4', '')
-								.replace('webm', '')
-								.replace('i.imgur.com', 'imgur.com'); //change i.imgur.com to imgur.com
-
-						let encodedStr = ''; //initialize encoded string as empty string
-
-						stringToEncode = String(stringToEncode); //make doubly sure stringToEncode is a string
-
-						//if url seems correct
-						if (stringToEncode.toLowerCase().startsWith('imgur.com')) {
-							//Check for album or gallery URL
-							if (stringToEncode.replace('imgur.com/', '').startsWith('a/') || stringToEncode.replace('imgur.com/', '').startsWith('gallery/')) {
-								//Album URL, what follows is all to get the direct image link, since the album URL is not a direct link to the file.
-
-								//Fetch imgur album page
-								try {
-									const parser = new DOMParser();
-									stringToEncode = await Net.fetch('https://' + stringToEncode, {
-										method: 'GET',
-										mode: 'cors'
-									}).then((res) =>
-										res
-											.text()
-											//parse html, queryselect meta tag with certain name
-											.then((res) => parser.parseFromString(res, 'text/html').querySelector('[name="twitter:player"]').content)
-									);
-									stringToEncode = stringToEncode
-										.replace('http://', '') //get rid of protocol
-										.replace('https://', '') //get rid of protocol
-										.replace('i.imgur.com', 'imgur.com')
-										.replace('.jpg', '')
-										.replace('.jpeg', '')
-										.replace('.webp', '')
-										.replace('.png', '')
-										.replace('.mp4', '')
-										.replace('.webm', '')
-										.replace('.gifv', '')
-										.replace('.gif', '') //get rid of any file extension
-										.split('?')[0]; //remove any URL parameters since we don't want or need them
-								} catch (err) {
-									Logger.error('BDNitro', err);
-									UI.showToast('An error occurred. Are there multiple images in this album/gallery?', { type: 'error', forceShow: true });
-									return;
-								}
-							}
-							if (stringToEncode == '') {
-								UI.showToast("An error occurred: couldn't find file name.", { type: 'error', forceShow: true });
-								Logger.error('BDNitro', "Couldn't find file name when trying to grab Imgur URL for Profile Banner for some reason. Contact srgobi.");
-								return;
-							}
-							//add starting "B{" , remove "imgur.com/" , and add ending "}"
-							stringToEncode = 'B{' + stringToEncode.replace('imgur.com/', '') + '}';
-							//finally encode the string, adding a space before it so nothing fucks up
-							encodedStr = ' ' + secondsightifyEncodeOnly(stringToEncode);
-
-							//If this is not an Imgur URL, yell at the user.
-						} else if (stringToEncode.toLowerCase().startsWith('imgur.com') == false) {
-							UI.showToast('Please use Imgur!', { type: 'warning' });
-							return;
-						}
-
-						//if somehow none of the previous code ran, this is the last protection against an error. If this runs, something has probably gone horribly wrong.
-						if (encodedStr == '') return;
-
-						//copy to clipboard
-						try {
-							DiscordNative.clipboard.copy(encodedStr);
-							UI.showToast('3y3 copied to clipboard!', { type: 'info' });
-						} catch (err) {
-							UI.showToast('Failed to copy to clipboard!', { type: 'error', forceShow: true });
-							Logger.error('BDNitro', err);
-						}
-					} //end of onClick function
-				}) //end of react createElement
-			); //end of profileBannerButton element push
-		}); //end of patched function
-	} //End of bannerUrlEncoding()
-	//#endregion
+	//save app icon on change
+	saveAppIcon({ type, id }) {
+		settings.appIcon = id;
+		Data.save('settings', settings);
+	}
 
 	//#region App Icons
 	appIcons() {
-		//technically don't need this anymore but i'll leave it in for the sake of redundancy
-		Patcher.before(this.meta.name, appIconButtonsModule, 'CTAButtons', (_, args) => {
-			args[0].disabled = false; //force buttons clickable
+		//restore app icon on start
+		Dispatcher.dispatch({
+			type: 'APP_ICON_UPDATED',
+			id: settings.appIcon
 		});
 
-		Patcher.instead(this.meta.name, AppIcon, 'AppIconHome', (_, __, originalFunction) => {
-			const currentDesktopIcon = CurrentDesktopIcon.getCurrentDesktopIcon();
+		Dispatcher.subscribe('APP_ICON_UPDATED', this.saveAppIcon);
+
+		Patcher.instead(RegularAppIcon, 'render', (_, [args], ogFunction) => {
+			const currentDesktopIcon = AppIconPersistedStoreState.getCurrentDesktopIcon();
 			if (currentDesktopIcon == 'AppIcon') {
-				return React.createElement(RegularAppIcon, {
+				return React.createElement(ogFunction, {
 					size: 'custom',
 					color: 'currentColor',
-					width: 30,
-					height: 30
+					width: 24,
+					height: 24
 				});
 			} else {
 				return React.createElement(CustomAppIcon, {
 					id: currentDesktopIcon,
-					width: 48
+					size: 40
 				});
 			}
 		});
@@ -3877,10 +4777,10 @@ module.exports = class BDNitro {
 			let res = await fetch(this.meta.updateUrl);
 
 			if (!res.ok && res.status != 200) {
-				Logger.warn('BDNitro', res);
+				Logger.warn(res);
 				res = await Net.fetch(this.meta.updateUrl);
 				if (!res.ok && res.status != 200) {
-					Logger.error('BDNitro', res);
+					Logger.error(res);
 					throw new Error('Failed to check for updates!');
 				}
 			}
@@ -3892,34 +4792,39 @@ module.exports = class BDNitro {
 
 			if (parseInt(remoteVersion[0]) > parseInt(currentVersion[0])) {
 				this.newUpdateNotify(remoteMeta, fileContent);
+				return true;
 			} else if (remoteVersion[0] == currentVersion[0] && parseInt(remoteVersion[1]) > parseInt(currentVersion[1])) {
 				this.newUpdateNotify(remoteMeta, fileContent);
+				return true;
 			} else if (remoteVersion[0] == currentVersion[0] && remoteVersion[1] == currentVersion[1] && parseInt(remoteVersion[2]) > parseInt(currentVersion[2])) {
 				this.newUpdateNotify(remoteMeta, fileContent);
+				return true;
 			}
 		} catch (err) {
 			UI.showToast('[BDNitro] Failed to check for updates', { type: 'error' });
-			Logger.error(this.meta.name, err);
+			Logger.error(err);
 		}
 	}
 
 	newUpdateNotify(remoteMeta, remoteFile) {
-		Logger.info(this.meta.name, 'A new update is available!');
+		Logger.info(`Update ${remoteMeta.version} is available!`);
 
-		UI.showConfirmationModal('Update Available', [`Update ${remoteMeta.version} is now available for BDNitro!`, 'Press Download Now to update!'], {
-			confirmText: 'Download Now',
-			onConfirm: async (e) => {
-				if (remoteFile) {
-					await new Promise((r) => fs.writeFile(path.join(Plugins.folder, `${this.meta.name}.plugin.js`), remoteFile, r));
-					try {
-						let currentVersionInfo = Data.load(this.meta.name, 'currentVersionInfo');
-						currentVersionInfo.hasShownChangelog = false;
-						Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
-					} catch (err) {
-						UI.showToast('An error occurred when trying to download the update!', { type: 'error', forceShow: true });
+		UI.showNotification({
+			title: 'BDNitro Update Available!',
+			content: `Update ${remoteMeta.version} is now available!`,
+			actions: [
+				{
+					label: 'Update',
+					onClick: async (e) => {
+						try {
+							await new Promise((r) => fs.writeFile(path.join(Plugins.folder, `${this.meta.name}.plugin.js`), remoteFile, r));
+						} catch (err) {
+							UI.showToast('An error occurred when trying to download the update!', { type: 'error', forceShow: true });
+							Logger.error(err);
+						}
 					}
 				}
-			}
+			]
 		});
 	}
 	//#endregion
@@ -3930,7 +4835,7 @@ module.exports = class BDNitro {
 			fs.writeFileSync(dataFilePath, JSON.stringify(data));
 		} catch (err) {
 			UI.showToast(`[${this.meta.name}] Error saving dava JSON. See console for error message.`, { type: 'error', forceShow: true });
-			Logger.error(this.meta.name, err);
+			Logger.error(err);
 		}
 	}
 
@@ -3945,28 +4850,26 @@ module.exports = class BDNitro {
 				data = Object.assign({}, defaultData, JSON.parse(fs.readFileSync(dataFilePath)));
 			} catch (err) {
 				UI.showToast(`[${this.meta.name}] Error parsing or reading data JSON.`, { type: 'error', forceShow: true });
-				Logger.warn(this.meta.name, 'Error parsing or reading data JSON.');
-				Logger.warn(this.meta.name, err);
-				data = {};
+				Logger.error(`Error parsing or reading ${this.meta.name}.data.json.`, err);
+				data = defaultData;
 			}
 		} catch (err) {
 			UI.showToast(`[${this.meta.name}] An error occurred loading the data file.`, { type: 'error', forceShow: true });
-			Logger.error(this.meta.name, 'An error occurred loading the data file.');
-			Logger.error(this.meta.name, err);
+			Logger.error('An error occurred loading the data file.', err);
 		}
 	}
 
 	//#region Start, Stop
 	start() {
-		Logger.info(this.meta.name, '(v' + this.meta.version + ') has started.');
+		Logger.info('(v' + this.meta.version + ') has started.');
 
 		try {
 			//load settings from config
-			settings = Object.assign({}, defaultSettings, Data.load(this.meta.name, 'settings'));
+			settings = Object.assign({}, defaultSettings, Data.load('settings'));
 		} catch (err) {
 			//The super mega awesome data-unfucker 9000
-			Logger.warn(this.meta.name, err);
-			Logger.info(this.meta.name, 'Error parsing JSON. Resetting file to default...');
+			Logger.warn(err);
+			Logger.info('Error parsing JSON. Resetting file to default...');
 			//watch this shit yo
 			fs.rmSync(path.join(Plugins.folder, `${this.meta.name}.config.json`));
 			Plugins.reload(this.meta.name);
@@ -3980,13 +4883,13 @@ module.exports = class BDNitro {
 		try {
 			let currentVersionInfo = {};
 			try {
-				currentVersionInfo = Object.assign({}, { version: this.meta.version, hasShownChangelog: false }, Data.load('BDNitro', 'currentVersionInfo'));
+				currentVersionInfo = Object.assign({}, { version: this.meta.version, hasShownChangelog: false }, Data.load('currentVersionInfo'));
 			} catch (err) {
 				currentVersionInfo = { version: this.meta.version, hasShownChangelog: false };
 			}
 			if (this.meta.version != currentVersionInfo.version) currentVersionInfo.hasShownChangelog = false;
 			currentVersionInfo.version = this.meta.version;
-			Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
+			Data.save('currentVersionInfo', currentVersionInfo);
 
 			if (settings.checkForUpdates) this.checkForUpdate();
 
@@ -4003,30 +4906,141 @@ module.exports = class BDNitro {
 					]
 				});
 				currentVersionInfo.hasShownChangelog = true;
-				Data.save(this.meta.name, 'currentVersionInfo', currentVersionInfo);
+				Data.save('currentVersionInfo', currentVersionInfo);
 			}
 		} catch (err) {
-			Logger.error(this.meta.name, err);
+			Logger.error(err);
 		}
+
+		DOM.addStyle(
+			'BDNitroGeneral',
+			`
+            /*wow it's discord css code*/
+            .bd-text-h5 {
+                line-height: 20px;
+                color: var(--header-primary);
+                font-size: 16px;
+                font-weight: 500;
+                margin-bottom: 8px;
+                text-transform: unset 
+            }
+            .bd-generic-button {
+                align-items: center;
+                background: none;
+                border: 1px solid var(--control-primary-border-default);
+                border-radius: 8px;
+                box-sizing: border-box;
+                display: flex;
+                font-size: 14px;
+                font-weight: var(--font-weight-medium);
+                justify-content: center;
+                line-height: 16px;
+                padding: 2px 16px;
+                position: relative;
+                transition-duration: .2s;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                user-select: none;
+                cursor: pointer;
+                color: var(--control-primary-text-default);
+                background-color: var(--control-primary-background-default);
+                transition: background-color var(--custom-button-transition-duration) ease;
+            }
+
+            .bd-generic-button:hover {
+                background-color: var(--control-primary-background-active);
+            }
+
+            .bd-resolution-swapper-v2-button {
+                background-color: var(--control-secondary-background-default);
+                height: 40px;
+                width: 40px;
+                align-items: center;
+                color: var(--control-secondary-text-default);
+                border: 1px solid var(--control-secondary-border-default);
+                border-radius: 8px;
+                box-sizing: border-box;
+                display: flex;
+                font-size: 14px;
+                font-weight: var(--font-weight-medium);
+                justify-content: center;
+                line-height: 16px;
+                padding: 2px 16px;
+                position: relative;
+                transition-duration: .2s;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                user-select: none;
+                cursor: pointer;
+                transition: background-color var(--custom-button-transition-duration) ease,color var(--custom-button-transition-duration) ease;
+            }
+
+            .bd-secondary-button {
+                background-color: var(--control-secondary-background-default) !important;
+                align-items: center;
+                color: var(--control-secondary-text-default);
+                border: 1px solid var(--control-secondary-border-default);
+                border-radius: 8px;
+                box-sizing: border-box;
+                display: flex;
+                font-size: 16px;
+                font-weight: var(--font-weight-medium);
+                justify-content: center;
+                line-height: 16px;
+                position: relative;
+                transition-duration: .2s;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                user-select: none;
+                cursor: pointer;
+                transition: background-color var(--custom-button-transition-duration) ease,color var(--custom-button-transition-duration) ease;
+            }
+
+            .bd-resolution-swapper-v2-button:hover, .bd-secondary-button:hover {
+                background-color: var(--control-secondary-background-active) !important;
+            }
+
+            .bd-marginTop24 {
+                margin-top: 24px;
+            }
+
+            .bd-hidden {
+                display: none !important;
+                visibility: hidden !important;
+            }
+        `
+		);
 
 		this.saveAndUpdate();
 	}
 
 	stop() {
+		controller.abort();
 		CurrentUser.premiumType = ORIGINAL_NITRO_STATUS;
-		Patcher.unpatchAll(this.meta.name);
+		Patcher.unpatchAll();
 		Dispatcher.unsubscribe('COLLECTIBLES_CATEGORIES_FETCH_SUCCESS', this.storeProductsFromCategories);
-		DOM.removeStyle(this.meta.name);
+		Dispatcher.unsubscribe('APP_ICON_UPDATED', this.saveAppIcon);
+		Dispatcher.unsubscribe('CURRENT_USER_UPDATE', this.experiments);
+		Dispatcher.unsubscribe('CURRENT_USER_UPDATE', this.applyPremiumType);
+		Dispatcher.unsubscribe('CURRENT_USER_UPDATE', this.updateCurrentUser);
 		DOM.removeStyle('BDNitroBadges');
+		DOM.removeStyle('BDNitroGeneral');
+		ContextMenu.unpatch('expression-picker', this.expressionPickerFunction);
+		ContextMenu.unpatch('stream-context', this.streamContextPatch);
 
+		if (ffmpeg) {
+			ffmpeg.terminate();
+			ffmpeg = undefined;
+		}
 		let ffmpegScript = document.getElementById('ffmpegScript');
 		if (ffmpegScript) {
 			ffmpegScript.remove();
 		}
+		if (window.FFmpegWASM) delete window.FFmpegWASM;
 
-		Data.save('BDNitro', 'settings', settings);
+		Data.save('settings', settings);
 		this.saveDataFile();
-		Logger.info(this.meta.name, '(v' + this.meta.version + ') has stopped.');
+		Logger.info('(v' + this.meta.version + ') has stopped.');
 	}
 	// #endregion
 };
